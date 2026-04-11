@@ -1368,7 +1368,7 @@
       const { name, episodes: list } = await res.json();
       if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
       if (!list.length) {
-        statusEl.textContent = 'No transcripts found in the transcripts/ folder.';
+        statusEl.textContent = 'No available transcripts currently assigned to you.';
         return;
       }
       const episodeSelectEl = document.getElementById('episode-select');

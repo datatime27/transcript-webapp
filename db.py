@@ -389,7 +389,7 @@ def get_episodes_for_user(user_uid):
                )
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
-               WHERE ue.user_uid = %s
+               WHERE ue.user_uid = %s AND (season.is_complete IS NULL OR season.is_complete = 0)
                ORDER BY s.name, season.number, e.number""",
             (user_uid,),
         )
