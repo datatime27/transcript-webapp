@@ -22,7 +22,7 @@ try:
     from datetime import datetime, timezone
     from pathlib import Path
     from urllib.parse import parse_qs
-    from db import get_episodes_for_user, get_user_name, get_version, insert_version
+    from db import get_episodes_for_user, get_user_name, get_version, insert_version, set_episode_complete, set_wants_more
 
 
     def valid_id(uid):
@@ -82,8 +82,10 @@ try:
             body   = json.dumps({"error": "Invalid JSON body"})
             return
 
-        video_id = str(data.get("id",       "") or "").strip()
-        user_uid = str(data.pop("user_uid", "") or "").strip() or None
+        video_id    = str(data.get("id",          "") or "").strip()
+        user_uid    = str(data.pop("user_uid",    "") or "").strip() or None
+        is_complete = bool(data.pop("is_complete", False))
+        wants_more  = bool(data.pop("wants_more",  False))
         data.pop("speakers", None)
 
         if not valid_id(video_id):
@@ -99,6 +101,10 @@ try:
 
         try:
             new_version = insert_version(video_id, rel_path, user_uid)
+            if is_complete and user_uid:
+                set_episode_complete(video_id, user_uid)
+            if wants_more and user_uid:
+                set_wants_more(user_uid, True)
         except ValueError as e:
             status = "404 Not Found"
             body   = json.dumps({"error": str(e)})

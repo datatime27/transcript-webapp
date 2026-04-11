@@ -9,6 +9,7 @@ CREATE TABLE seasons (
     show_uid VARCHAR(8)   NOT NULL,
     number   INT          NOT NULL,
     title    VARCHAR(255),
+    is_complete TINYINT(1)   DEFAULT NULL,
     PRIMARY KEY (uid),
     UNIQUE  KEY uq_season (show_uid, number),
     FOREIGN KEY (show_uid) REFERENCES shows(uid)
@@ -31,8 +32,10 @@ CREATE TABLE users (
     uid      VARCHAR(8)   NOT NULL,
     email    VARCHAR(255) NOT NULL,
     name     VARCHAR(255),
+    location        VARCHAR(255),
     is_admin        TINYINT(1)   DEFAULT NULL,
     is_test_account TINYINT(1)   DEFAULT NULL,
+    wants_more      TINYINT(1)   DEFAULT NULL,
     PRIMARY KEY (uid),
     UNIQUE KEY uq_email (email)
 );
@@ -40,6 +43,7 @@ CREATE TABLE users (
 CREATE TABLE user_episodes (
     user_uid    VARCHAR(8) NOT NULL,
     episode_uid VARCHAR(8) NOT NULL,
+    is_complete TINYINT(1) DEFAULT NULL,
     PRIMARY KEY (user_uid, episode_uid),
     FOREIGN KEY (user_uid)    REFERENCES users(uid),
     FOREIGN KEY (episode_uid) REFERENCES episodes(uid)

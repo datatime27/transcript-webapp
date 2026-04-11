@@ -140,6 +140,12 @@
       border-bottom: 1px solid #2a2a2a;
       font-weight: 500;
     }
+    .users-table th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    .users-table th.sortable:hover { color: #fff; }
+    .sort-indicator { margin-left: 4px; opacity: 0.5; font-size: 0.75em; }
 
     .users-table td {
       padding: 6px 10px;
@@ -233,6 +239,18 @@
 
     #add-episode-panel strong { color: #e0e0e0; }
 
+    .completed-seasons-toggle {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 14px 0 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .completed-seasons-toggle:hover { color: #999; }
+
     .season-separator {
       font-size: 0.8rem;
       font-weight: 600;
@@ -297,13 +315,20 @@
     .episode-user-tag, a.episode-user-tag:visited {
       font-size: 0.75rem;
       padding: 2px 8px;
-      background: #1e2a1e;
-      color: #a5d6a7;
-      border: 1px solid #2a4a2a;
+      background: #2a2a1e;
+      color: #d6d0a7;
+      border: 1px solid #4a461e;
       border-radius: 4px;
       text-decoration: none;
     }
-    a.episode-user-tag:hover { background: #253a25; }
+    a.episode-user-tag:hover { background: #3a3a25; }
+
+    .episode-user-tag.completed, a.episode-user-tag.completed:visited {
+      background: #1e2a1e;
+      color: #a5d6a7;
+      border-color: #2a4a2a;
+    }
+    a.episode-user-tag.completed:hover { background: #253a25; }
 
     .episode-user-tag.unstarted, a.episode-user-tag.unstarted:visited {
       background: #2a1e1e;
@@ -387,14 +412,16 @@
       <table class="users-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Email</th>
+            <th class="sortable" onclick="sortUsers('name')">Name <span class="sort-indicator" id="sort-name"></span></th>
+            <th class="sortable" onclick="sortUsers('email')">Email <span class="sort-indicator" id="sort-email"></span></th>
+            <th class="sortable" onclick="sortUsers('location')">Location <span class="sort-indicator" id="sort-location"></span></th>
+            <th class="sortable" onclick="sortUsers('wants_more')">Wants More <span class="sort-indicator" id="sort-wants_more"></span></th>
             <th>Link</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-tbody">
-          <tr><td colspan="4">Loading…</td></tr>
+          <tr><td colspan="6">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -427,6 +454,10 @@
     <div class="form-row">
       <label for="new-name">Name</label>
       <input type="text" id="new-name" placeholder="Display name (optional)" />
+    </div>
+    <div class="form-row">
+      <label for="new-location">Location</label>
+      <input type="text" id="new-location" placeholder="e.g. UK, US, Australia (optional)" />
     </div>
     <label class="checkbox-row">
       <input type="checkbox" id="new-is-test" /> Test account
@@ -495,6 +526,8 @@ Greg Davies</textarea>
     let allUsers              = [];
     let selectedUserEmail     = null;
     let allEpisodesWithUsers  = [];
+    let userSortKey           = null;
+    let userSortAsc           = true;
 
     async function loadData() {
       const res  = await fetch(`./admin.py?user=${userUid}`);
@@ -563,33 +596,70 @@ Greg Davies</textarea>
       out.style.display  = 'block';
     }
 
+    function renderEpisodeRow(ep) {
+      const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
+      const users = visibleUsers.length
+        ? visibleUsers.map(u => {
+            const cls     = u.version_number == null ? 'episode-user-tag unstarted'
+                          : u.is_complete             ? 'episode-user-tag completed'
+                          :                             'episode-user-tag';
+            const version = u.version_number != null ? ` v${u.version_number}` : '';
+            const href    = u.version_uid
+              ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
+              : `viewer.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
+            return `<a class="${cls}" href="${href}" target="_blank">${escHtml(u.user_name || u.user_uid)}${version}</a>`;
+          }).join('')
+        : '<span class="episode-no-users">no users allocated</span>';
+      return `<div class="episode-row${ep.has_merged ? ' merged' : ''}">
+        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">${escHtml(ep.show_name || '—')} S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button></div>
+        <div class="episode-users">${users}</div>
+      </div>`;
+    }
+
     function renderEpisodesWithUsers(episodes) {
       const container = document.getElementById('episodes-list');
-      let lastSeason = null;
-      const parts = [];
-      episodes.forEach(ep => {
-        const seasonKey = `${ep.show_name}|${ep.season_number}`;
-        if (seasonKey !== lastSeason) {
-          parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number}</div>`);
-          lastSeason = seasonKey;
-        }
-        const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
-        const users = visibleUsers.length
-          ? visibleUsers.map(u => {
-              const cls     = u.version_number == null ? 'episode-user-tag unstarted' : 'episode-user-tag';
-              const version = u.version_number != null ? ` v${u.version_number}` : '';
-              const href    = u.version_uid
-                ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
-                : `viewer.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
-              return `<a class="${cls}" href="${href}" target="_blank">${escHtml(u.user_name || u.user_uid)}${version}</a>`;
-            }).join('')
-          : '<span class="episode-no-users">no users allocated</span>';
-        parts.push(`<div class="episode-row${ep.has_merged ? ' merged' : ''}">
-          <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">${escHtml(ep.show_name || '—')} S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button></div>
-          <div class="episode-users">${users}</div>
-        </div>`);
-      });
-      container.innerHTML = parts.join('') || '<p>No episodes found</p>';
+      if (!episodes.length) { container.innerHTML = '<p>No episodes found</p>'; return; }
+
+      const activeEps    = episodes.filter(ep => !ep.season_complete);
+      const completedEps = episodes.filter(ep =>  ep.season_complete);
+
+      function buildSeasonBlocks(eps) {
+        let lastSeason = null;
+        const parts = [];
+        eps.forEach(ep => {
+          const seasonKey = `${ep.show_name}|${ep.season_number}`;
+          if (seasonKey !== lastSeason) {
+            parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number}</div>`);
+            lastSeason = seasonKey;
+          }
+          parts.push(renderEpisodeRow(ep));
+        });
+        return parts.join('');
+      }
+
+      let html = buildSeasonBlocks(activeEps);
+
+      if (completedEps.length) {
+        html += `<div class="completed-seasons-toggle" onclick="toggleCompletedSeasons()">
+          ▶ Completed seasons (<span id="completed-season-count"></span>)
+        </div>
+        <div id="completed-seasons" style="display:none">${buildSeasonBlocks(completedEps)}</div>`;
+      }
+
+      container.innerHTML = html;
+
+      if (completedEps.length) {
+        const seasonCount = new Set(completedEps.map(ep => `${ep.show_name}|${ep.season_number}`)).size;
+        document.getElementById('completed-season-count').textContent = seasonCount;
+      }
+    }
+
+    function toggleCompletedSeasons() {
+      const panel  = document.getElementById('completed-seasons');
+      const toggle = document.querySelector('.completed-seasons-toggle');
+      const open   = panel.style.display === 'none';
+      panel.style.display = open ? '' : 'none';
+      toggle.firstChild.textContent = open ? '▼ ' : '▶ ';
     }
 
     function renderRecentVersions(versions) {
@@ -604,9 +674,38 @@ Greg Davies</textarea>
       ).join('') || '<tr><td colspan="4">No activity in the last 24 hours</td></tr>';
     }
 
+    const SORT_COLS = ['name', 'email', 'location', 'wants_more'];
+
+    function sortUsers(key) {
+      if (userSortKey === key) {
+        userSortAsc = !userSortAsc;
+      } else {
+        userSortKey = key;
+        userSortAsc = key !== 'wants_more'; // bools default descending (true first); strings ascending
+      }
+      SORT_COLS.forEach(col => {
+        const el = document.getElementById(`sort-${col}`);
+        el.textContent = col === userSortKey ? (userSortAsc ? '▲' : '▼') : '';
+      });
+      renderUsers(allUsers);
+    }
+
     function renderUsers(users) {
       const tbody     = document.getElementById('users-tbody');
       const testUsers = users.filter(u => u.is_test_account);
+      if (userSortKey) {
+        users = [...users].sort((a, b) => {
+          let valA = a[userSortKey], valB = b[userSortKey];
+          if (userSortKey === 'wants_more') {
+            const diff = (valB ? 1 : 0) - (valA ? 1 : 0);
+            return userSortAsc ? -diff : diff;
+          }
+          valA = (valA || '').toLowerCase();
+          valB = (valB || '').toLowerCase();
+          const diff = valA < valB ? -1 : valA > valB ? 1 : 0;
+          return userSortAsc ? diff : -diff;
+        });
+      }
 
       tbody.innerHTML = users.map(u => {
         const adminBadge = u.is_admin        ? '<span class="badge badge-admin">admin</span>' : '';
@@ -614,10 +713,12 @@ Greg Davies</textarea>
         return `<tr>
           <td>${escHtml(u.name || '—')}${adminBadge}${testBadge}</td>
           <td>${escHtml(u.email)}</td>
+          <td>${escHtml(u.location || '—')}</td>
+          <td style="text-align:center">${u.wants_more ? '✓' : ''}</td>
           <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
           <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.email))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
-      }).join('') || '<tr><td colspan="4">No users found</td></tr>';
+      }).join('') || '<tr><td colspan="6">No users found</td></tr>';
 
       const btn = document.getElementById('delete-test-btn');
       document.getElementById('test-count').textContent = testUsers.length;
@@ -680,16 +781,18 @@ Greg Davies</textarea>
     async function createUser() {
       const email          = document.getElementById('new-email').value.trim();
       const name           = document.getElementById('new-name').value.trim();
+      const location       = document.getElementById('new-location').value.trim();
       const is_test_account = document.getElementById('new-is-test').checked ? 1 : null;
       if (!email) { showResult('create-result', false, 'Email is required.'); return; }
       clearResult('create-result');
 
-      const res  = await post({ action: 'create_user', email, name: name || null, is_test_account });
+      const res  = await post({ action: 'create_user', email, name: name || null, location: location || null, is_test_account });
       const data = await res.json();
       if (res.ok) {
         showResult('create-result', true, `Created user with uid: ${data.uid}`);
-        document.getElementById('new-email').value = '';
-        document.getElementById('new-name').value  = '';
+        document.getElementById('new-email').value    = '';
+        document.getElementById('new-name').value     = '';
+        document.getElementById('new-location').value = '';
         document.getElementById('new-is-test').checked = false;
         await loadData();
       } else {

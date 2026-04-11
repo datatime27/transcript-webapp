@@ -182,6 +182,81 @@
     #save-btn:hover { border-color: #4caf50; color: #4caf50; }
     #save-btn:disabled { opacity: 0.4; cursor: default; }
 
+    #done-btn {
+      background: none;
+      border: 1px solid #555;
+      padding: 4px 14px;
+      border-radius: 5px;
+      font-size: 0.82rem;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #done-btn:hover { border-color: #4caf50; color: #4caf50; }
+    #done-btn:disabled { opacity: 0.4; cursor: default; }
+
+    #done-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #done-modal.open { display: flex; }
+    #done-modal-inner {
+      background: #141414;
+      border: 3px solid white;
+      border-radius: 12px;
+      padding: 28px 32px;
+      max-width: 420px;
+      width: 90%;
+    }
+    #done-modal p {
+      font-size: 0.95rem;
+      color: #e0e0e0;
+      margin-bottom: 18px;
+    }
+    #done-modal .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: #ccc;
+      margin-bottom: 22px;
+      cursor: pointer;
+    }
+    #done-modal .modal-btns {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    #done-modal-ok {
+      padding: 7px 20px;
+      background: none;
+      border: 1px solid #4caf50;
+      color: #4caf50;
+      border-radius: 5px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #done-modal-ok:hover { background: rgba(76,175,80,0.15); }
+    #done-modal-cancel {
+      padding: 7px 20px;
+      background: none;
+      border: 1px solid #555;
+      color: #aaa;
+      border-radius: 5px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #done-modal-cancel:hover { border-color: #888; color: #ccc; }
+
     #settings-btn, #help-btn {
       background: none;
       border: none;
@@ -664,6 +739,7 @@
     <span id="version-badge"></span>
     <span id="slomo-badge" style="display:none;font-size:0.8rem;color:#f0a500;"></span>
     <button id="save-btn">Save</button>
+    <button id="done-btn">I'm Done!</button>
     <button id="help-btn" title="Help">?</button>
     <button id="settings-btn" title="Settings">⚙</button>
     <div id="settings-popup">
@@ -704,6 +780,19 @@
   <div id="help-modal">
     <div id="help-modal-inner">
       <button id="help-modal-close" title="Close">✕</button>
+    </div>
+  </div>
+  <div id="done-modal">
+    <div id="done-modal-inner">
+      <p>I have finished this episode (email Peter if you change your mind)</p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="done-wants-more" />
+        I'm ready for another episode
+      </label>
+      <div class="modal-btns">
+        <button id="done-modal-cancel">Cancel</button>
+        <button id="done-modal-ok">OK</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1348,6 +1437,49 @@
         btn.style.borderColor = '';
         btn.style.color = '';
       }, SAVE_FEEDBACK_MS);
+    }
+  });
+
+  document.getElementById('done-btn').addEventListener('click', () => {
+    document.getElementById('done-wants-more').checked = false;
+    document.getElementById('done-modal').classList.add('open');
+  });
+
+  document.getElementById('done-modal-cancel').addEventListener('click', () => {
+    document.getElementById('done-modal').classList.remove('open');
+  });
+
+  document.getElementById('done-modal-ok').addEventListener('click', async () => {
+    const wantsMore = document.getElementById('done-wants-more').checked;
+    document.getElementById('done-modal').classList.remove('open');
+    const saveBtn = document.getElementById('save-btn');
+    const doneBtn = document.getElementById('done-btn');
+    saveBtn.disabled = true;
+    doneBtn.disabled = true;
+    doneBtn.textContent = 'Saving…';
+    try {
+      const payload = { ...transcriptData, captions, user_uid: userUid, is_complete: true, wants_more: wantsMore || undefined };
+      const res = await fetch('./transcripts.py', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let result;
+      try { result = JSON.parse(text); } catch { throw new Error(text || res.status); }
+      if (!res.ok) throw new Error(result.error || res.status);
+      unsavedChanges = false;
+      if (result.version != null) setTitleVersion(result.version);
+      doneBtn.textContent = 'Done ✓';
+      doneBtn.style.borderColor = '#4caf50';
+      doneBtn.style.color = '#4caf50';
+      doneBtn.disabled = true;
+      saveBtn.disabled = false;
+    } catch (err) {
+      doneBtn.textContent = "I'm Done!";
+      doneBtn.disabled = false;
+      saveBtn.disabled = false;
+      alert(`Failed to mark as complete: ${err.message}`);
     }
   });
 

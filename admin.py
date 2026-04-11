@@ -96,11 +96,12 @@ def action_delete_test_accounts(data):
 def action_create_user(data):
     email           = str(data.get("email", "") or "").strip()
     name            = str(data.get("name",  "") or "").strip() or None
+    location        = str(data.get("location", "") or "").strip() or None
     is_test_account = data.get("is_test_account") or None
     if not email:
         return "400 Bad Request", json.dumps({"error": "email is required"})
     try:
-        uid = create_user(email, name, is_test_account)
+        uid = create_user(email, name, is_test_account, location)
         return "200 OK", json.dumps({"uid": uid})
     except Exception as e:
         return "409 Conflict", json.dumps({"error": str(e)})

@@ -36,7 +36,7 @@ def get_db_connection():
     )
 
 
-def create_user(email, name=None, is_test_account=None):
+def create_user(email, name=None, is_test_account=None, location=None):
     """
     Create a new user and return their generated uid.
 
@@ -44,14 +44,15 @@ def create_user(email, name=None, is_test_account=None):
         email           : the user's email address (must be unique)
         name            : optional display name
         is_test_account : optional flag to mark as a test account
+        location        : optional location string
     """
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         uid = generate_uid(cur, "users")
         cur.execute(
-            "INSERT INTO users (uid, email, name, is_test_account) VALUES (%s, %s, %s, %s)",
-            (uid, email, name, is_test_account),
+            "INSERT INTO users (uid, email, name, is_test_account, location) VALUES (%s, %s, %s, %s, %s)",
+            (uid, email, name, is_test_account, location),
         )
         conn.commit()
         return uid
@@ -133,7 +134,8 @@ def get_episodes_with_user_versions():
                       MAX(v.version_number),
                       SUBSTRING_INDEX(GROUP_CONCAT(v.uid ORDER BY v.version_number DESC), ',', 1),
                       s.name, season.number, e.number, u.is_admin, u.is_test_account,
-                      (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid)
+                      (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid),
+                      season.is_complete, ue.is_complete
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -148,22 +150,24 @@ def get_episodes_with_user_versions():
             ep_uid = row[0]
             if ep_uid not in episodes:
                 episodes[ep_uid] = {
-                    "episode_uid":    ep_uid,
-                    "youtube_id":     row[2],
-                    "show_name":      row[7],
-                    "season_number":  row[8],
-                    "episode_number": row[9],
-                    "has_merged":     bool(row[12]),
-                    "users":          [],
+                    "episode_uid":     ep_uid,
+                    "youtube_id":      row[2],
+                    "show_name":       row[7],
+                    "season_number":   row[8],
+                    "episode_number":  row[9],
+                    "has_merged":      bool(row[12]),
+                    "season_complete": bool(row[13]),
+                    "users":           [],
                 }
             if row[3] is not None:
                 episodes[ep_uid]["users"].append({
-                    "user_name":      row[3],
-                    "user_uid":       row[4],
-                    "version_number": row[5],  # NULL = allocated but not started
-                    "version_uid":    row[6],   # NULL if not started
-                    "is_admin":       bool(row[10]),
-                    "is_test_account": bool(row[11]),
+                    "user_name":        row[3],
+                    "user_uid":         row[4],
+                    "version_number":   row[5],  # NULL = allocated but not started
+                    "version_uid":      row[6],   # NULL if not started
+                    "is_admin":         bool(row[10]),
+                    "is_test_account":  bool(row[11]),
+                    "is_complete":      bool(row[14]),
                 })
         for ep in episodes.values():
             ep["users"].sort(key=lambda u: (u["version_uid"] is not None, u["user_name"]))
@@ -223,7 +227,7 @@ def get_all_users():
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT uid, email, name, is_admin, is_test_account FROM users ORDER BY name",
+            "SELECT uid, email, name, is_admin, is_test_account, location, wants_more FROM users ORDER BY name",
         )
         return [
             {
@@ -232,6 +236,8 @@ def get_all_users():
                 "name":            row[2],
                 "is_admin":        bool(row[3]),
                 "is_test_account": bool(row[4]),
+                "location":        row[5],
+                "wants_more":      bool(row[6]),
             }
             for row in cur.fetchall()
         ]
@@ -293,6 +299,7 @@ def add_episode_to_user(email, youtube_id):
             "INSERT IGNORE INTO user_episodes (user_uid, episode_uid) VALUES (%s, %s)",
             (user_uid, episode_uid),
         )
+        cur.execute("UPDATE users SET wants_more = NULL WHERE uid = %s", (user_uid,))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -489,6 +496,45 @@ def insert_version(youtube_id, filepath, user_uid, is_merged=None):
         new_version = cur.fetchone()[0]
         conn.commit()
         return new_version
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def set_wants_more(user_uid, value):
+    """Set the wants_more flag on a user."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET wants_more = %s WHERE uid = %s",
+            (1 if value else None, user_uid),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def set_episode_complete(youtube_id, user_uid):
+    """Set is_complete = 1 on the user_episodes row for this user and episode."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT uid FROM episodes WHERE youtube_id = %s", (youtube_id,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"No episode found with YouTube ID: {youtube_id}")
+        episode_uid = row[0]
+        cur.execute(
+            "UPDATE user_episodes SET is_complete = 1 WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        conn.commit()
     except Exception:
         conn.rollback()
         raise
