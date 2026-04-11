@@ -472,6 +472,16 @@
       flex: 1;
     }
 
+    .caption-text[contenteditable="true"] {
+      outline: 1px solid #64b5f6;
+      border-radius: 2px;
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 2px;
+      white-space: pre-wrap;
+      cursor: text;
+    }
+
     .caption-line.active .caption-text { color: #fff; }
 
     .caption-line.selected {
@@ -1182,7 +1192,31 @@
 
         const textSpan = document.createElement('span');
         textSpan.className = 'caption-text';
-        textSpan.innerHTML = cap.text;
+        textSpan.textContent = cap.text;
+
+        textSpan.addEventListener('click', e => {
+          e.stopPropagation();
+          if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+          textSpan.contentEditable = 'true';
+          textSpan.focus();
+        });
+
+        textSpan.addEventListener('blur', () => {
+          textSpan.contentEditable = 'false';
+          const newText = textSpan.textContent;
+          if (newText !== captions[i].text) {
+            captions[i].text = newText;
+            captions[i].modified = true;
+            unsavedChanges = true;
+            line.classList.toggle('modified', !!captions[i].modified);
+          }
+        });
+
+        textSpan.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); textSpan.blur(); }
+          if (e.key === 'Escape') { textSpan.textContent = captions[i].text; textSpan.blur(); }
+          e.stopPropagation();
+        });
 
         line.appendChild(timeSpan);
         line.appendChild(captionSpeakerBtn);
@@ -1287,15 +1321,21 @@
 
   async function initPlayer(videoId, seekSeconds = null) {
     await loadYouTubeAPI();
+    let seekPauseOnce = seekSeconds !== null;
     ytPlayer = new YT.Player('player', {
       videoId,
       playerVars: { rel: 0, modestbranding: 1 },
       events: {
         onReady() {
           if (seekSeconds !== null) ytPlayer.seekTo(seekSeconds, true);
-          ytPlayer.pauseVideo();
           clearInterval(pollInterval);
           pollInterval = setInterval(syncTranscript, POLL_INTERVAL_MS);
+        },
+        onStateChange(event) {
+          if (seekPauseOnce && event.data === YT.PlayerState.PLAYING) {
+            seekPauseOnce = false;
+            ytPlayer.pauseVideo();
+          }
         }
       }
     });
