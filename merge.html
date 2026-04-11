@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcript Merge</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 18px; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Load screen ──────────────────────────────────────────────────────── */
+
+    #load-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #load-screen h1 { font-size: 1.5rem; color: #fff; }
+    #load-screen p  { color: #888; font-size: 0.9rem; }
+
+    #episode-select {
+      padding: 10px 14px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      min-width: 360px;
+      cursor: pointer;
+    }
+
+    .btn {
+      padding: 10px 24px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #cc0000; }
+    .btn:disabled { background: #555; cursor: default; }
+
+    .btn-subtle {
+      padding: 6px 14px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .btn-subtle:hover { background: #3a3a3a; }
+
+    #error-msg {
+      color: #f66;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    /* ── Diff screen ──────────────────────────────────────────────────────── */
+
+    #diff-screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #diff-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: #141414;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    #diff-header h2 {
+      font-size: 1rem;
+      color: #fff;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    #progress {
+      font-size: 0.85rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    #progress.all-resolved { color: #4a8; }
+
+    #show-agreed-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: #aaa;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #diff-main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #player-panel {
+      flex: 0 0 38%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #2a2a2a;
+    }
+
+    #player-container {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%; /* 16:9 */
+    }
+
+    #player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #table-wrap {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .col-time { cursor: pointer; }
+    .col-time:hover { color: #e0e0e0; }
+
+    /* ── Diff table ───────────────────────────────────────────────────────── */
+
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .diff-table th {
+      background: #1a1a1a;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid #333;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .diff-table th.col-user { color: #aae; }
+    .diff-table th.col-user.col-disabled { color: #555; }
+    .diff-table th.col-user.col-disabled a { text-decoration: line-through; }
+    .diff-table th.col-result { color: #aea; }
+    .btn-toggle-col {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 5px;
+      font-size: 0.7rem;
+      border: 1px solid #446;
+      border-radius: 3px;
+      cursor: pointer;
+      background: #223;
+      color: #aae;
+      vertical-align: middle;
+      user-select: none;
+    }
+    .btn-toggle-col:hover { background: #334; }
+    .col-disabled .btn-toggle-col { border-color: #444; background: #1a1a1a; color: #777; }
+
+    .diff-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid #1e1e1e;
+      vertical-align: middle;
+    }
+
+    .col-time {
+      white-space: nowrap;
+      color: #999;
+      font-size: 0.8rem;
+      width: 58px;
+    }
+
+    .col-text {
+      color: #e0e0e0;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .col-result {
+      white-space: nowrap;
+      font-weight: 600;
+      min-width: 100px;
+    }
+
+    /* Agreed rows */
+    .row-agreed { opacity: 0.35; }
+    .row-agreed.show-agreed { opacity: 1; }
+    .row-agreed.show-agreed .col-text { color: #aaa; }
+
+    /* Disagreed rows */
+    .row-disagreed { background: #141410; }
+    .row-disagreed td { border-bottom-color: #2a2a20; }
+
+    /* Active conflict row */
+    .row-active { background: #1a0000 !important; }
+    .row-active td:first-child { border-left: 3px solid #c00; }
+
+    /* Speaker cells */
+    .speaker-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      cursor: default;
+      white-space: nowrap;
+    }
+
+    .row-disagreed .speaker-cell {
+      cursor: pointer;
+      border-color: #333;
+    }
+
+    .row-disagreed .speaker-cell:hover { background: #2a2a2a; border-color: #555; }
+
+    .speaker-cell.selected {
+      background: #0e2e0e;
+      border-color: #3a7a3a !important;
+    }
+
+    .speaker-cell.missing {
+      color: #444;
+      border-color: transparent !important;
+      cursor: default;
+      font-style: italic;
+    }
+
+    .badge-m {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #4a8;
+      letter-spacing: 0.02em;
+    }
+
+    .badge-t {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #f80;
+      letter-spacing: 0.02em;
+    }
+
+    .text-snippet {
+      display: block;
+      font-size: 0.68rem;
+      color: #888;
+      font-style: italic;
+      margin-top: 2px;
+      max-width: 130px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .result-unresolved {
+	  color: red;
+	  font-weight: 800;
+	}
+    .result-resolved   { color: #aea; }
+
+/* ── Save screen ──────────────────────────────────────────────────────── */
+
+    #save-screen {
+      display: none;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #save-screen p { font-size: 1rem; }
+    #save-screen .success { color: #4a8; }
+    #save-screen .failure { color: #f66; }
+  </style>
+</head>
+<body>
+
+  <!-- Load screen -->
+  <div id="load-screen">
+    <h1>Transcript Merge</h1>
+    <p>Compare all user versions of an episode and produce a merged result.</p>
+    <select id="episode-select"><option value="">Loading episodes…</option></select>
+    <button class="btn" onclick="compare()">Compare</button>
+    <p id="error-msg"></p>
+  </div>
+
+  <!-- Diff screen -->
+  <div id="diff-screen">
+    <div id="diff-header">
+      <h2 id="episode-title"></h2>
+      <span id="progress"></span>
+      <button class="btn-subtle" onclick="jumpToConflict(-1)">↑ Prev conflict</button>
+      <button class="btn-subtle" onclick="jumpToConflict(1)">↓ Next conflict</button>
+      <label id="show-agreed-label">
+        <input type="checkbox" id="show-agreed" onchange="toggleAgreed()" /> Show agreed
+      </label>
+      <button class="btn" id="save-btn" onclick="save()">Save Merge</button>
+    </div>
+    <div id="diff-main">
+      <div id="player-panel">
+        <div id="player-container">
+          <div id="player"></div>
+        </div>
+      </div>
+      <div id="table-wrap">
+        <table class="diff-table">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save screen -->
+  <div id="save-screen">
+    <p id="save-msg"></p>
+    <button class="btn" onclick="reset()">Merge another episode</button>
+  </div>
+
+  <script>
+    const params  = new URLSearchParams(location.search);
+    const userUid = params.get('user');
+
+    const preselectedEpisode = params.get('episode');
+
+    if (!userUid) {
+      document.getElementById('error-msg').textContent = 'Missing required URL parameter: user';
+      document.getElementById('error-msg').style.display = 'block';
+      document.querySelector('.btn').disabled = true;
+      document.getElementById('episode-select').disabled = true;
+    } else if (preselectedEpisode) {
+      compare(preselectedEpisode);
+    } else {
+      loadEpisodes();
+    }
+
+    let episodeData          = null;  // full response from merge.py GET
+    let selections           = [];    // [{speaker, modified} | null] per unified-caption index
+    let unifiedCaptions      = [];    // union of all captions across versions, sorted by start time
+    let ytPlayer             = null;
+    let conflictIndices      = [];    // caption indices that are disagreed
+    let activeConflictIndex  = -1;    // index into conflictIndices
+    let activeRow            = null;  // TR element currently highlighted as active conflict
+    let disabledVersions     = new Set(); // version indices excluded from diff
+
+    // ── Data loading ────────────────────────────────────────────────────────
+
+    async function loadEpisodes() {
+      const res  = await fetch(`./merge.py?user=${userUid}`);
+      const data = await res.json();
+      const sel  = document.getElementById('episode-select');
+      if (!res.ok) {
+        sel.innerHTML = '<option value="">Error loading episodes</option>';
+        showError(data.error || 'Failed to load episodes');
+        return;
+      }
+      if (!data.length) {
+        sel.innerHTML = '<option value="">No episodes ready to merge</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">Select an episode…</option>';
+      data.forEach(ep => {
+        const opt = document.createElement('option');
+        opt.value = ep.episode_uid;
+        opt.textContent = decodeHtml(ep.title);
+        sel.appendChild(opt);
+      });
+    }
+
+    async function compare(episodeUidOverride) {
+      const episodeUid = episodeUidOverride || document.getElementById('episode-select').value;
+      if (!episodeUid) return;
+
+      showError('');
+      const loadBtn = document.querySelector('#load-screen .btn');
+      if (!episodeUidOverride) {
+        loadBtn.textContent = 'Loading…';
+        loadBtn.disabled = true;
+      }
+
+      const res  = await fetch(`./merge.py?episode=${episodeUid}&user=${userUid}`);
+      const data = await res.json();
+
+      if (!episodeUidOverride) {
+        loadBtn.textContent = 'Compare';
+        loadBtn.disabled = false;
+      }
+
+      if (!res.ok) { showError(data.error || 'Failed to load versions'); return; }
+      if (data.versions.length < 2) { showError('Need at least 2 user versions to compare.'); return; }
+
+      episodeData     = data;
+      unifiedCaptions = buildUnifiedCaptions(data.versions);
+      document.getElementById('episode-title').textContent = decodeHtml(data.title || '');
+      initSelections();
+      renderDiff();
+      document.getElementById('load-screen').style.display = 'none';
+      document.getElementById('diff-screen').style.display = 'flex';
+      initPlayer(data.youtube_id);
+    }
+
+    // ── Selection logic ──────────────────────────────────────────────────────
+
+    function buildUnifiedCaptions(versions) {
+      const parseStart = cap => parseFloat(String(cap.start || '').trim().replace(/s$/, '')) || 0;
+      const keyOf      = cap => String(cap.start);
+
+      const map = new Map();
+      versions.forEach((v, vi) => {
+        v.captions.forEach(cap => {
+          const k = keyOf(cap);
+          if (!map.has(k)) {
+            map.set(k, { start: cap.start, duration: cap.duration,
+                         perVersion: new Array(versions.length).fill(null) });
+          }
+          map.get(k).perVersion[vi] = cap;
+        });
+      });
+
+      const rows = Array.from(map.values()).sort((a, b) => parseStart(a) - parseStart(b));
+      rows.forEach(row => {
+        const present = row.perVersion.filter(c => c !== null);
+        const texts   = present.map(c => c.text || '');
+        row.textConflict = texts.length > 1 && !texts.every(t => t === texts[0]);
+      });
+      return rows;
+    }
+
+    function majorityVote(present, keyFn) {
+      const counts = {};
+      present.forEach(c => { const k = keyFn(c); counts[k] = (counts[k] || 0) + 1; });
+      const max     = Math.max(...Object.values(counts));
+      const winners = Object.keys(counts).filter(k => counts[k] === max);
+      return winners.length === 1 ? present.find(c => keyFn(c) === winners[0]) : null;
+    }
+
+    function initSelections() {
+      selections = [];
+
+      for (const row of unifiedCaptions) {
+        const present = row.perVersion.filter((c, vi) => c !== null && !disabledVersions.has(vi));
+        if (present.length === 0) { selections.push(null); continue; }
+
+        if (row.textConflict) {
+          // Vote on (text, speaker) pair; tie → null
+          const winning = majorityVote(present, c => `${c.text || ''}|||${c.speaker}`);
+          if (winning) {
+            selections.push({ speaker: winning.speaker, text: winning.text, modified: winning.modified });
+          } else {
+            selections.push(null);
+          }
+        } else {
+          const speakers = present.map(c => c.speaker);
+          const allSame  = speakers.every(s => s === speakers[0]);
+
+          if (allSame) {
+            selections.push({ speaker: speakers[0], modified: present[0].modified });
+          } else {
+            // Majority vote among present versions; tie → null (unresolved)
+            const winning = majorityVote(present, c => c.speaker);
+            if (winning) {
+              selections.push({ speaker: winning.speaker, modified: winning.modified });
+            } else {
+              selections.push(null);
+            }
+          }
+        }
+      }
+    }
+
+    function toggleVersion(vi) {
+      if (disabledVersions.has(vi)) disabledVersions.delete(vi);
+      else disabledVersions.add(vi);
+
+      // Re-evaluate selections without discarding user choices:
+      // - auto-resolve rows that now agree across enabled versions
+      // - keep existing selections that are still valid in an enabled version
+      // - null out selections that are no longer backed by any enabled version
+      unifiedCaptions.forEach((row, i) => {
+        const present  = row.perVersion.filter((c, idx) => c !== null && !disabledVersions.has(idx));
+        if (present.length === 0) { selections[i] = null; return; }
+
+        const texts    = present.map(c => c.text || '');
+        const speakers = present.map(c => c.speaker);
+        const textSame = texts.every(t => t === texts[0]);
+        const spkSame  = speakers.every(s => s === speakers[0]);
+
+        if (textSame && spkSame) {
+          // All enabled versions now agree — auto-resolve
+          selections[i] = { speaker: speakers[0], modified: present[0].modified };
+          return;
+        }
+
+        // Still a conflict — keep existing selection only if it matches an enabled version
+        if (selections[i] !== null) {
+          const stillValid = present.some(c =>
+            c.speaker === selections[i].speaker &&
+            (!row.textConflict || (c.text || '') === (selections[i].text || ''))
+          );
+          if (!stillValid) selections[i] = null;
+        }
+      });
+
+      renderDiff();
+    }
+
+    function selectCell(captionIndex, versionIndex) {
+      const cap = unifiedCaptions[captionIndex].perVersion[versionIndex];
+      if (!cap) return;
+      const sel = { speaker: cap.speaker, modified: cap.modified };
+      if (unifiedCaptions[captionIndex].textConflict) sel.text = cap.text || '';
+      selections[captionIndex] = sel;
+      refreshRow(captionIndex);
+      updateProgress();
+      const ci = conflictIndices.indexOf(captionIndex);
+      if (ci !== -1) setActiveConflict(ci);
+    }
+
+// ── Rendering ────────────────────────────────────────────────────────────
+
+    function renderDiff() {
+      const versions   = episodeData.versions;
+      const showAgreed = document.getElementById('show-agreed').checked;
+
+      // Header row
+      const thead = document.getElementById('thead');
+      thead.innerHTML = '';
+
+      const headerRow = document.createElement('tr');
+      headerRow.innerHTML =
+        '<th class="col-time">Time</th>' +
+        '<th class="col-text">Text</th>' +
+        versions.map((v, vi) => {
+          const href     = `viewer.html?user=${encodeURIComponent(v.user_uid)}&episode=${encodeURIComponent(episodeData.episode_uid)}`;
+          const disabled = disabledVersions.has(vi) ? ' col-disabled' : '';
+          const btnLabel = disabledVersions.has(vi) ? 'off' : 'on';
+          const btnTitle = disabledVersions.has(vi) ? 'Re-enable column' : 'Exclude from diff';
+          return `<th class="col-user${disabled}"><a href="${escHtml(href)}" target="_blank" style="color:inherit;text-decoration:none;" title="Open in viewer">${escHtml(v.user_name)}</a><span class="btn-toggle-col" onclick="toggleVersion(${vi})" title="${btnTitle}">${btnLabel}</span></th>`;
+        }).join('') +
+        '<th class="col-result">Result</th>';
+      thead.appendChild(headerRow);
+
+      // Body rows
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      conflictIndices     = [];
+      activeConflictIndex = -1;
+      activeRow           = null;
+
+      unifiedCaptions.forEach((row, i) => {
+        const present  = row.perVersion.filter((c, vi) => c !== null && !disabledVersions.has(vi));
+        const texts    = present.map(c => c.text || '');
+        const speakers = present.map(c => c.speaker);
+        const agreed   = texts.every(t => t === texts[0]) && speakers.every(s => s === speakers[0]);
+        if (!agreed) conflictIndices.push(i);
+        tbody.appendChild(buildRow(i, agreed, showAgreed));
+      });
+
+      updateProgress();
+    }
+
+    function buildRow(i, agreed, showAgreed) {
+      const unified  = unifiedCaptions[i];
+      const baseCap  = unified.perVersion.find(c => c !== null);
+      const tr       = document.createElement('tr');
+      tr.dataset.index = i;
+      tr.className = agreed ? ('row-agreed' + (showAgreed ? ' show-agreed' : '')) : 'row-disagreed';
+
+      const seconds = parseFloat(String(baseCap.start || '').trim().replace('s', ''));
+      const time    = escHtml(seconds.toFixed(2) + 's');
+      const text    = escHtml(truncate(baseCap.text || '', 70));
+      const tBadge  = unified.textConflict ? ' <span class="badge-t">T</span>' : '';
+
+      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="col-text">${text}${tBadge}</td>`;
+
+      unified.perVersion.forEach((cap, vi) => {
+        const isDisabled = disabledVersions.has(vi);
+        if (cap === null) {
+          cells += `<td data-vi="${vi}"><span class="speaker-cell missing">—</span></td>`;
+        } else {
+          const mBadge     = cap.modified ? '<span class="badge-m">M</span>' : '';
+          const isSelected = !isDisabled && !agreed && selections[i] &&
+            selections[i].speaker === cap.speaker &&
+            (!unified.textConflict || selections[i].text === (cap.text || ''));
+          const selected   = isSelected ? ' selected' : '';
+          const clickAttr  = (agreed || isDisabled) ? '' : ` onclick="selectCell(${i}, ${vi})"`;
+          const dimAttr    = isDisabled ? ' style="opacity:0.3"' : '';
+          const snippet    = unified.textConflict
+            ? `<span class="text-snippet">${escHtml(truncate(cap.text || '', 28))}</span>`
+            : '';
+          cells += `<td data-vi="${vi}"${dimAttr}><span class="speaker-cell${selected}"${clickAttr}>${escHtml(cap.speaker)}${mBadge}${snippet}</span></td>`;
+        }
+      });
+
+      cells += `<td class="col-result">${resultCell(i)}</td>`;
+      tr.innerHTML = cells;
+      return tr;
+    }
+
+    function resultCell(i) {
+      const sel = selections[i];
+      if (!sel) return '<span class="result-unresolved">?</span>';
+      const mBadge = sel.modified ? ' <span class="badge-m">M</span>' : '';
+      return `<span class="result-resolved">${escHtml(sel.speaker)}${mBadge}</span>`;
+    }
+
+    function refreshRow(i) {
+      const tr = document.querySelector(`tr[data-index="${i}"]`);
+      if (!tr) return;
+
+      const unified = unifiedCaptions[i];
+      unified.perVersion.forEach((cap, vi) => {
+        if (disabledVersions.has(vi)) return;
+        const td   = tr.querySelector(`td[data-vi="${vi}"]`);
+        const cell = td && td.querySelector('.speaker-cell');
+        if (!cell || cell.classList.contains('missing')) return;
+        const isSelected = selections[i] &&
+          selections[i].speaker === cap.speaker &&
+          (!unified.textConflict || selections[i].text === (cap.text || ''));
+        cell.classList.toggle('selected', isSelected);
+      });
+
+      const tds = tr.querySelectorAll('td');
+      tds[tds.length - 1].innerHTML = resultCell(i);
+    }
+
+    function updateProgress() {
+      const total      = conflictIndices.length;
+      const unresolved = conflictIndices.filter(i => selections[i] === null).length;
+      const resolved   = total - unresolved;
+      const el         = document.getElementById('progress');
+
+      if (total === 0) {
+        el.textContent = 'No conflicts';
+        el.className   = 'all-resolved';
+      } else if (unresolved === 0) {
+        el.textContent = `All ${total} conflicts resolved`;
+        el.className   = 'all-resolved';
+      } else {
+        el.textContent = `${resolved} / ${total} conflicts resolved`;
+        el.className   = '';
+      }
+
+      document.getElementById('save-btn').disabled = unresolved > 0;
+    }
+
+    function toggleAgreed() {
+      const show = document.getElementById('show-agreed').checked;
+      document.querySelectorAll('.row-agreed').forEach(tr => {
+        tr.classList.toggle('show-agreed', show);
+      });
+    }
+
+    function setActiveConflict(idx) {
+      activeConflictIndex = idx;
+      if (activeRow) activeRow.classList.remove('row-active');
+      const captionIndex = conflictIndices[idx];
+      if (captionIndex == null) { activeRow = null; return; }
+      activeRow = document.querySelector(`tr[data-index="${captionIndex}"]`);
+      if (!activeRow) return;
+      activeRow.classList.add('row-active');
+      activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    function jumpToConflict(direction) {
+      if (!conflictIndices.length) return;
+      const next = activeConflictIndex + direction;
+      if (next < 0) setActiveConflict(conflictIndices.length - 1);
+      else if (next >= conflictIndices.length) setActiveConflict(0);
+      else setActiveConflict(next);
+    }
+
+    // ── Save ────────────────────────────────────────────────────────────────
+
+    async function save() {
+      const captions = unifiedCaptions.map((row, i) => {
+        const base = row.perVersion.find(c => c !== null);
+        const sel  = selections[i];
+        return {
+          text:     (row.textConflict && sel && sel.text != null) ? sel.text : base.text,
+          start:    base.start,
+          duration: base.duration,
+          speaker:  sel.speaker,
+          modified: sel.modified,
+        };
+      });
+
+      document.getElementById('save-btn').disabled = true;
+      document.getElementById('save-btn').textContent = 'Saving…';
+
+      const res  = await fetch(`./merge.py?user=${userUid}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          youtube_id: episodeData.youtube_id,
+          title:      episodeData.title,
+          captions,
+        }),
+      });
+      const data = await res.json();
+
+      document.getElementById('diff-screen').style.display = 'none';
+      document.getElementById('save-screen').style.display = 'flex';
+      const msg = document.getElementById('save-msg');
+      if (res.ok) {
+        msg.className   = 'success';
+        msg.textContent = `Saved as version ${data.version} (${data.saved})`;
+      } else {
+        msg.className   = 'failure';
+        msg.textContent = `Error: ${data.error}`;
+      }
+    }
+
+    function seekTo(seconds) {
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        ytPlayer.seekTo(seconds, true);
+        ytPlayer.playVideo();
+      }
+    }
+
+    function loadYouTubeAPI() {
+      return new Promise(resolve => {
+        if (window.YT && window.YT.Player) { resolve(); return; }
+        window.onYouTubeIframeAPIReady = resolve;
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      });
+    }
+
+    async function initPlayer(videoId) {
+      await loadYouTubeAPI();
+      if (ytPlayer) { try { ytPlayer.destroy(); } catch {} ytPlayer = null; }
+      ytPlayer = new YT.Player('player', {
+        videoId,
+        playerVars: { rel: 0, modestbranding: 1 },
+      });
+    }
+
+    function reset() {
+      episodeData      = null;
+      selections       = [];
+      unifiedCaptions  = [];
+      disabledVersions = new Set();
+      if (ytPlayer) { try { ytPlayer.destroy(); } catch {} ytPlayer = null; }
+      document.getElementById('save-screen').style.display  = 'none';
+      document.getElementById('load-screen').style.display  = 'flex';
+      document.getElementById('save-btn').textContent = 'Save Merge';
+    }
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+
+    function truncate(str, n) { return str.length > n ? str.slice(0, n) + '…' : str; }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent   = msg;
+      el.style.display = msg ? 'block' : 'none';
+    }
+
+    function decodeHtml(str) {
+      const el = document.createElement('textarea');
+      el.innerHTML = str;
+      return el.value;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

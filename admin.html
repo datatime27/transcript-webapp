@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 18px; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      margin-bottom: 32px;
+    }
+
+    .section {
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+
+    .section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      font-size: 0.8rem;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    select {
+      padding: 8px 12px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      width: 100%;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #666;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: #ccc;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+
+    .checkbox-row input { width: auto; }
+
+    .btn {
+      padding: 9px 22px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover    { background: #cc0000; }
+    .btn:disabled { background: #555; cursor: default; }
+
+    .btn-danger {
+      background: #8b0000;
+    }
+    .btn-danger:hover { background: #6b0000; }
+
+    .result {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      padding: 8px 12px;
+      border-radius: 5px;
+      display: none;
+    }
+    .result.success { background: #0e2e0e; color: #4a8; border: 1px solid #2a5a2a; }
+    .result.error   { background: #2e0e0e; color: #f88; border: 1px solid #5a2a2a; }
+
+    /* Users table */
+    #user-filter {
+      width: 100%;
+      padding: 7px 12px;
+      margin-bottom: 10px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 5px;
+      color: #e0e0e0;
+      font-size: 0.85rem;
+    }
+    #user-filter:focus { outline: none; border-color: #555; }
+
+    .users-table-wrap {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+
+    .users-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    .users-table th {
+      text-align: left;
+      padding: 6px 10px;
+      border-bottom: 1px solid #2a2a2a;
+      font-weight: 500;
+    }
+
+    .users-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #1e1e1e;
+      color: #ccc;
+    }
+
+    .users-table tr:last-child td { border-bottom: none; }
+    .users-table tbody tr:hover td { background: #1e1e1e; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .badge-admin { background: #1a3a6a; color: #88aaee; }
+    .badge-test  { background: #3a2a0a; color: #cc9944; }
+
+    .btn-small {
+      padding: 3px 10px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-small:hover { background: #3a3a3a; }
+
+    #scan-results {
+      display: none;
+      margin-top: 16px;
+    }
+    #scan-results h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+    .scan-item {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .scan-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .scan-filename {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 3px;
+      font-family: monospace;
+    }
+    .scan-title {
+      font-size: 0.85rem;
+      color: #ddd;
+    }
+    .scan-meta {
+      font-size: 0.75rem;
+      color: #777;
+      margin-top: 3px;
+    }
+    .scan-meta span {
+      color: #aaa;
+    }
+
+    #add-episode-panel {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+    }
+
+    #add-episode-panel p {
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+
+    #add-episode-panel strong { color: #e0e0e0; }
+
+    .season-separator {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 14px 0 4px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 2px;
+    }
+    .season-separator:first-child { padding-top: 0; }
+
+    .episode-row {
+      padding: 8px 0;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .episode-row:last-child { border-bottom: none; }
+    .episode-row.merged {
+      background: #005500;
+    }
+
+    a.episode-merge-link, a.episode-merge-link:visited {
+      color: #ddd;
+      text-decoration: none;
+    }
+    a.episode-merge-link:hover { color: #fff; text-decoration: underline; }
+
+    .episode-title {
+      font-size: 0.88rem;
+      color: #ddd;
+      margin-bottom: 4px;
+    }
+    .episode-youtube-id, a.episode-youtube-id:visited {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      background: #203040;
+      color: #ddeeff;
+      border: 1px solid #2a2a4a;
+      border-radius: 4px;
+      text-decoration: none;
+    }
+    a.episode-youtube-id:hover { background: #2a4060; }
+    .copy-id-btn {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      background: #203040;
+      color: #aac;
+      border: 1px solid #2a2a4a;
+      border-radius: 4px;
+      cursor: pointer;
+      vertical-align: middle;
+      margin-left: 2px;
+    }
+    .copy-id-btn:hover { background: #2a4060; color: #ddeeff; }
+
+    .episode-users {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .episode-user-tag, a.episode-user-tag:visited {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      background: #1e2a1e;
+      color: #a5d6a7;
+      border: 1px solid #2a4a2a;
+      border-radius: 4px;
+      text-decoration: none;
+    }
+    a.episode-user-tag:hover { background: #253a25; }
+
+    .episode-user-tag.unstarted, a.episode-user-tag.unstarted:visited {
+      background: #2a1e1e;
+      color: #d6a7a7;
+      border-color: #333;
+    }
+    a.episode-user-tag.unstarted:hover { background: #252525; }
+
+    .episode-no-users {
+      font-size: 0.78rem;
+      font-style: italic;
+    }
+
+    #load-error {
+      color: #f66;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    textarea { font-family: inherit; resize: vertical; }
+
+    .section-note  { font-weight: 400; font-size: 0.8rem; }
+    .text-small    { font-size: 0.75rem; }
+    .text-timestamp{ font-size: 0.75rem; }
+    .link-user     { color: #88aaee; }
+    .btn-row       { display: flex; gap: 8px; margin-top: 4px; }
+    .mt-12         { margin-top: 12px; }
+    .form-row-inline { flex-direction: row; gap: 16px; }
+    .form-row-inline > .form-row { flex: 1; margin-bottom: 0; }
+
+  </style>
+</head>
+<body>
+  <h1>Admin</h1>
+  <p id="load-error"></p>
+
+  <!-- Recent activity -->
+  <div class="section">
+    <h2>Recent Versions <span class="section-note">(last 7 days)</span></h2>
+    <div class="users-table-wrap">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Episode</th>
+            <th>Version</th>
+            <th>Saved at</th>
+          </tr>
+        </thead>
+        <tbody id="recent-tbody">
+          <tr><td colspan="4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Episodes -->
+  <div class="section">
+    <h2>Episodes</h2>
+    <div id="episodes-list">
+      <p>Loading…</p>
+    </div>
+  </div>
+
+  <!-- Season Progress -->
+  <div class="section">
+    <h2>Season Progress</h2>
+    <div class="form-row">
+      <select id="sp-season-select" onchange="renderSeasonProgress()">
+        <option value="">Select a season…</option>
+      </select>
+    </div>
+    <textarea id="sp-output" readonly style="display:none;width:100%;font-family:monospace;font-size:0.85rem;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:5px;padding:10px 12px;resize:vertical;"></textarea>
+  </div>
+
+  <!-- Users -->
+  <div class="section">
+    <h2>Users</h2>
+    <input type="text" id="user-filter" placeholder="Filter users…" autocomplete="off">
+    <div class="users-table-wrap">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Link</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody">
+          <tr><td colspan="4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="add-episode-panel">
+      <p>Add episode for <strong id="ae-user-name"></strong></p>
+      <div class="form-row">
+        <select id="ae-episode"><option value="">Select an episode…</option></select>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="addEpisodeToUser()">Add Episode</button>
+        <button class="btn-small" onclick="hideAddEpisodePanel()">Cancel</button>
+      </div>
+      <div class="result" id="add-episode-result"></div>
+    </div>
+    <div class="mt-12">
+      <button class="btn btn-danger" id="delete-test-btn" onclick="deleteTestAccounts()" style="display:none">
+        Delete test accounts (<span id="test-count">0</span>)
+      </button>
+    </div>
+    <div class="result" id="delete-result"></div>
+  </div>
+
+  <!-- Create user -->
+  <div class="section">
+    <h2>Create User</h2>
+    <div class="form-row">
+      <label for="new-email">Email</label>
+      <input type="email" id="new-email" placeholder="user@example.com" />
+    </div>
+    <div class="form-row">
+      <label for="new-name">Name</label>
+      <input type="text" id="new-name" placeholder="Display name (optional)" />
+    </div>
+    <label class="checkbox-row">
+      <input type="checkbox" id="new-is-test" /> Test account
+    </label>
+    <button class="btn" onclick="createUser()">Create User</button>
+    <div class="result" id="create-result"></div>
+  </div>
+
+  <!-- Season speakers -->
+  <div class="section">
+    <h2>Season Speakers</h2>
+    <div class="form-row">
+      <label for="ss-show">Show name</label>
+      <input type="text" id="ss-show" value="Taskmaster UK" />
+    </div>
+    <div class="form-row">
+      <label for="ss-season">Season</label>
+      <input type="number" id="ss-season" min="1" value="1" />
+    </div>
+    <div class="form-row">
+      <label for="ss-speakers">Speakers <span class="section-note">(one per line, in order)</span></label>
+      <textarea id="ss-speakers" rows="8">Alex Horne
+Greg Davies</textarea>
+    </div>
+    <button class="btn" onclick="setSeasonSpeakers()">Save Speakers</button>
+    <div class="result" id="speakers-result"></div>
+  </div>
+
+  <!-- Populate transcript -->
+  <div class="section">
+    <h2>Populate Transcript</h2>
+    <button class="btn-small" onclick="scanTranscripts(this)" style="margin-bottom:16px">Scan for new transcripts</button>
+    <div id="scan-results"></div>
+    <div class="form-row">
+      <label for="pt-path">JSON path <span class="section-note">(e.g. transcripts/rwKYWuVluJc.json)</span></label>
+      <input type="text" id="pt-path" placeholder="transcripts/xxxx.json" />
+    </div>
+    <div class="form-row">
+      <label for="pt-show">Show name</label>
+      <input type="text" id="pt-show" value="Taskmaster UK" />
+    </div>
+    <div class="form-row form-row-inline">
+      <div class="form-row">
+        <label for="pt-season">Season</label>
+        <input type="number" id="pt-season" min="1" value="1" />
+      </div>
+      <div class="form-row">
+        <label for="pt-episode">Episode</label>
+        <input type="number" id="pt-episode" min="1" value="1" />
+      </div>
+    </div>
+    <br />
+    <button class="btn" onclick="populateTranscript()">Populate</button>
+    <div class="result" id="populate-result"></div>
+  </div>
+
+<script>
+    const userUid = new URLSearchParams(location.search).get('user');
+
+    if (!userUid) {
+      document.getElementById('load-error').textContent = 'Missing required URL parameter: user';
+    } else {
+      loadData();
+    }
+
+    let allUsers              = [];
+    let selectedUserEmail     = null;
+    let allEpisodesWithUsers  = [];
+
+    async function loadData() {
+      const res  = await fetch(`./admin.py?user=${userUid}`);
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('load-error').textContent = data.error || 'Failed to load';
+        return;
+      }
+      allUsers = data.users;
+      allEpisodesWithUsers = data.episodes_with_user_versions;
+      renderRecentVersions(data.recent_versions);
+      renderEpisodesWithUsers(data.episodes_with_user_versions);
+      populateSeasonSelect(data.episodes_with_user_versions);
+      renderUsers(data.users);
+      renderEpisodeSelect(data.episodes);
+    }
+
+    function populateSeasonSelect(episodes) {
+      const sel = document.getElementById('sp-season-select');
+      const seen = new Set();
+      episodes.forEach(ep => {
+        const key = `${ep.show_name}|${ep.season_number}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          const opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = `${ep.show_name} — Season ${ep.season_number}`;
+          sel.appendChild(opt);
+        }
+      });
+    }
+
+    function renderSeasonProgress() {
+      const key = document.getElementById('sp-season-select').value;
+      const out = document.getElementById('sp-output');
+      if (!key) { out.style.display = 'none'; return; }
+      const [showName, seasonNum] = key.split('|');
+      const seasonEps = allEpisodesWithUsers.filter(
+        ep => ep.show_name === showName && String(ep.season_number) === seasonNum
+      );
+
+      // Build per-user stats across all episodes in the season
+      const userMap = {};
+      seasonEps.forEach(ep => {
+        const visibleUsers = ep.users.filter(u => !u.is_admin && !u.is_test_account);
+        visibleUsers.forEach(u => {
+          if (!userMap[u.user_uid]) {
+            userMap[u.user_uid] = {
+              user_name: u.user_name,
+              user_uid:  u.user_uid,
+              saved: 0,
+              total: 0,
+            };
+          }
+          userMap[u.user_uid].total++;
+          if (u.version_number != null) userMap[u.user_uid].saved++;
+        });
+      });
+
+      const users = Object.values(userMap).sort((a, b) =>
+        b.saved - a.saved || (a.user_name || '').localeCompare(b.user_name || '')
+      );
+
+      out.value = users.map(u => `${u.user_name || u.user_uid}: ${u.saved}`).join('\n');
+      out.rows  = Math.max(3, users.length);
+      out.style.display  = 'block';
+    }
+
+    function renderEpisodesWithUsers(episodes) {
+      const container = document.getElementById('episodes-list');
+      let lastSeason = null;
+      const parts = [];
+      episodes.forEach(ep => {
+        const seasonKey = `${ep.show_name}|${ep.season_number}`;
+        if (seasonKey !== lastSeason) {
+          parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number}</div>`);
+          lastSeason = seasonKey;
+        }
+        const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
+        const users = visibleUsers.length
+          ? visibleUsers.map(u => {
+              const cls     = u.version_number == null ? 'episode-user-tag unstarted' : 'episode-user-tag';
+              const version = u.version_number != null ? ` v${u.version_number}` : '';
+              const href    = u.version_uid
+                ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
+                : `viewer.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
+              return `<a class="${cls}" href="${href}" target="_blank">${escHtml(u.user_name || u.user_uid)}${version}</a>`;
+            }).join('')
+          : '<span class="episode-no-users">no users allocated</span>';
+        parts.push(`<div class="episode-row${ep.has_merged ? ' merged' : ''}">
+          <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">${escHtml(ep.show_name || '—')} S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button></div>
+          <div class="episode-users">${users}</div>
+        </div>`);
+      });
+      container.innerHTML = parts.join('') || '<p>No episodes found</p>';
+    }
+
+    function renderRecentVersions(versions) {
+      const tbody = document.getElementById('recent-tbody');
+      tbody.innerHTML = versions.map(v =>
+        `<tr>
+          <td><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(v.user_uid)}" target="_blank" class="link-user">${escHtml(v.user_name || '—')}</a></td>
+          <td>${escHtml(v.show || '—')} S${v.season} E${v.episode}</td>
+          <td>v${v.version_number}</td>
+          <td class="text-timestamp">${new Date(v.created_at).toLocaleString()}</td>
+        </tr>`
+      ).join('') || '<tr><td colspan="4">No activity in the last 24 hours</td></tr>';
+    }
+
+    function renderUsers(users) {
+      const tbody     = document.getElementById('users-tbody');
+      const testUsers = users.filter(u => u.is_test_account);
+
+      tbody.innerHTML = users.map(u => {
+        const adminBadge = u.is_admin        ? '<span class="badge badge-admin">admin</span>' : '';
+        const testBadge  = u.is_test_account ? '<span class="badge badge-test">test</span>'   : '';
+        return `<tr>
+          <td>${escHtml(u.name || '—')}${adminBadge}${testBadge}</td>
+          <td>${escHtml(u.email)}</td>
+          <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
+          <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.email))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="4">No users found</td></tr>';
+
+      const btn = document.getElementById('delete-test-btn');
+      document.getElementById('test-count').textContent = testUsers.length;
+      btn.style.display = testUsers.length ? 'inline-block' : 'none';
+    }
+
+    document.getElementById('user-filter').addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('#users-tbody tr').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    function renderEpisodeSelect(episodes) {
+      const sel = document.getElementById('ae-episode');
+      sel.innerHTML = '<option value="">Select an episode…</option>';
+      let lastSeason = null;
+      let group = null;
+      episodes.forEach(ep => {
+        const seasonKey = `${ep.show}|${ep.season}`;
+        if (seasonKey !== lastSeason) {
+          group = document.createElement('optgroup');
+          group.label = `${ep.show} — Season ${ep.season}`;
+          sel.appendChild(group);
+          lastSeason = seasonKey;
+        }
+        const opt = document.createElement('option');
+        opt.value = ep.youtube_id;
+        opt.textContent = `S${ep.season} E${ep.episode}`;
+        group.appendChild(opt);
+      });
+    }
+
+    function showAddEpisodePanel(email, name) {
+      selectedUserEmail = email;
+      document.getElementById('ae-user-name').textContent = name;
+      document.getElementById('ae-episode').value = '';
+      clearResult('add-episode-result');
+      document.getElementById('add-episode-panel').style.display = 'block';
+    }
+
+    function hideAddEpisodePanel() {
+      document.getElementById('add-episode-panel').style.display = 'none';
+      selectedUserEmail = null;
+    }
+
+    async function deleteTestAccounts() {
+      if (!confirm('Delete all test accounts? This also deletes their versions and episode assignments.')) return;
+      clearResult('delete-result');
+      const res  = await post({ action: 'delete_test_accounts' });
+      const data = await res.json();
+      if (res.ok) {
+        showResult('delete-result', true, `Deleted ${data.deleted} test account(s).`);
+        await loadData();
+      } else {
+        showResult('delete-result', false, data.error);
+      }
+    }
+
+    async function createUser() {
+      const email          = document.getElementById('new-email').value.trim();
+      const name           = document.getElementById('new-name').value.trim();
+      const is_test_account = document.getElementById('new-is-test').checked ? 1 : null;
+      if (!email) { showResult('create-result', false, 'Email is required.'); return; }
+      clearResult('create-result');
+
+      const res  = await post({ action: 'create_user', email, name: name || null, is_test_account });
+      const data = await res.json();
+      if (res.ok) {
+        showResult('create-result', true, `Created user with uid: ${data.uid}`);
+        document.getElementById('new-email').value = '';
+        document.getElementById('new-name').value  = '';
+        document.getElementById('new-is-test').checked = false;
+        await loadData();
+      } else {
+        showResult('create-result', false, data.error);
+      }
+    }
+
+    let _scanResults = [];
+
+    async function scanTranscripts(btn) {
+      const scanDiv = document.getElementById('scan-results');
+      btn.disabled = true;
+      btn.textContent = 'Scanning…';
+      scanDiv.style.display = 'none';
+      scanDiv.innerHTML = '';
+
+      const res  = await fetch(`./admin.py?user=${userUid}&action=scan_transcripts`);
+      const data = await res.json();
+      btn.disabled = false;
+      btn.textContent = 'Scan for new transcripts';
+
+      if (!res.ok) {
+        scanDiv.style.display = 'block';
+        scanDiv.innerHTML = `<div class="result error" style="display:block">${escHtml(data.error || 'Scan failed')}</div>`;
+        return;
+      }
+
+      _scanResults = data.results || [];
+      if (_scanResults.length === 0) {
+        scanDiv.style.display = 'block';
+        scanDiv.innerHTML = '<div class="result success" style="display:block">No new transcript files found.</div>';
+        return;
+      }
+
+      const items = _scanResults.map((r, i) => {
+        const metaParts = [];
+        if (r.show_name)      metaParts.push(`Show: <span>${escHtml(r.show_name)}</span>`);
+        if (r.season_number)  metaParts.push(`Season: <span>${r.season_number}</span>`);
+        if (r.episode_number) metaParts.push(`Episode: <span>${r.episode_number}</span>`);
+        const metaHtml = metaParts.length
+          ? `<div class="scan-meta">${metaParts.join(' &nbsp;·&nbsp; ')}</div>`
+          : `<div class="scan-meta" style="color:#666">Could not parse show/season/episode from title</div>`;
+        return `<div class="scan-item">
+          <div class="scan-item-info">
+            <div class="scan-filename">${escHtml(r.filename)}</div>
+            <div class="scan-title">${escHtml(r.title || '(no title)')}</div>
+            ${metaHtml}
+          </div>
+          <button class="btn-small" onclick="useScanResult(${i})">Use</button>
+        </div>`;
+      }).join('');
+
+      scanDiv.innerHTML = `<h3>${_scanResults.length} new file${_scanResults.length === 1 ? '' : 's'} found</h3>${items}`;
+      scanDiv.style.display = 'block';
+    }
+
+    function useScanResult(i) {
+      const r = _scanResults[i];
+      document.getElementById('pt-path').value    = r.filepath    || '';
+      document.getElementById('pt-show').value    = r.show_name   || '';
+      document.getElementById('pt-season').value  = r.season_number  != null ? r.season_number  : '';
+      document.getElementById('pt-episode').value = r.episode_number != null ? r.episode_number : '';
+      document.getElementById('pt-path').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function populateTranscript() {
+      const json_path      = document.getElementById('pt-path').value.trim();
+      const show_name      = document.getElementById('pt-show').value.trim();
+      const season_number  = parseInt(document.getElementById('pt-season').value);
+      const episode_number = parseInt(document.getElementById('pt-episode').value);
+
+      if (!json_path || !show_name || isNaN(season_number) || isNaN(episode_number)) {
+        showResult('populate-result', false, 'All fields are required.');
+        return;
+      }
+      clearResult('populate-result');
+
+      const res  = await post({ action: 'populate_transcript', json_path, show_name, season_number, episode_number });
+      const data = await res.json();
+      if (res.ok) {
+        showResult('populate-result', true, `Registered as version ${data.version}.`);
+      } else {
+        showResult('populate-result', false, data.error);
+      }
+    }
+
+    async function addEpisodeToUser() {
+      const email      = selectedUserEmail;
+      const youtube_id = document.getElementById('ae-episode').value;
+      if (!email || !youtube_id) { showResult('add-episode-result', false, 'Select an episode.'); return; }
+      clearResult('add-episode-result');
+
+      const res  = await post({ action: 'add_episode_to_user', email, youtube_id });
+      const data = await res.json();
+      if (res.ok) {
+        showResult('add-episode-result', true, 'Episode added to user.');
+      } else {
+        showResult('add-episode-result', false, data.error);
+      }
+    }
+
+    async function setSeasonSpeakers() {
+      const show_name     = document.getElementById('ss-show').value.trim();
+      const season_number = parseInt(document.getElementById('ss-season').value);
+      const raw           = document.getElementById('ss-speakers').value;
+      const speakers      = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+
+      if (!show_name || isNaN(season_number)) {
+        showResult('speakers-result', false, 'Show name and season are required.');
+        return;
+      }
+      if (!speakers.length) {
+        showResult('speakers-result', false, 'Enter at least one speaker.');
+        return;
+      }
+      clearResult('speakers-result');
+
+      const res  = await post({ action: 'set_season_speakers', show_name, season_number, speakers });
+      const data = await res.json();
+      if (res.ok) {
+        showResult('speakers-result', true, `Saved ${data.count} speaker(s).`);
+      } else {
+        showResult('speakers-result', false, data.error);
+      }
+    }
+
+    function post(body) {
+      return fetch(`./admin.py?user=${userUid}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      });
+    }
+
+    function clearResult(id) {
+      const el = document.getElementById(id);
+      el.style.display = 'none';
+      el.textContent   = '';
+    }
+
+    function showResult(id, success, msg) {
+      const el = document.getElementById(id);
+      el.className   = `result ${success ? 'success' : 'error'}`;
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function decodeHtml(str) {
+      const el = document.createElement('textarea');
+      el.innerHTML = str;
+      return el.value;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

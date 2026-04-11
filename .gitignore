@@ -1,0 +1,26 @@
+db.ini
+
+# User data
+users.txt
+transcripts/
+
+# Sensitive / operational
+speaker-swap-list.txt
+preprocess/cookies.txt
+preprocess/yt-dlp.txt
+
+# Large binary
+taskmaster-army.pdf
+
+# Scratch files
+bugs.txt
+transcript_diff.html
+transcript_diff2.html
+viewer-test.html
+preprocess/audio/
+preprocess/tmp-outputs/
+preprocess/__pycache__/
+__pycache__/
+
+# Claude Code
+.claude/

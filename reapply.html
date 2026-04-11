@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reapply Annotations</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 18px; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Loading / error ───────────────────────────────────────────────────── */
+
+    #load-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #load-screen p { color: #666; font-size: 0.9rem; }
+
+    .error-box {
+      background: #2e0e0e;
+      color: #f88;
+      border: 1px solid #5a2a2a;
+      border-radius: 5px;
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      max-width: 600px;
+      white-space: pre-wrap;
+    }
+
+    /* ── Main screen ───────────────────────────────────────────────────────── */
+
+    #main-screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: #141414;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    #header h2 {
+      font-size: 1rem;
+      color: #fff;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    #header h2 span {
+      font-size: 0.8rem;
+      color: #666;
+      font-weight: 400;
+      margin-left: 8px;
+    }
+
+    #summary {
+      font-size: 0.85rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    #summary .count-altered  { color: #f44336; font-weight: 600; }
+    #summary .count-match   { color: #4caf50; font-weight: 600; }
+    #summary .count-removed { color: #ff9800; font-weight: 600; }
+
+    .btn {
+      padding: 6px 16px;
+      background: #c00;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover    { background: #a00; }
+    .btn:disabled { background: #555; cursor: default; }
+
+    #save-msg {
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    #save-msg.save-success { color: #4caf50; }
+    #save-msg.save-error   { color: #f44336; }
+
+    .btn-subtle {
+      padding: 6px 14px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-subtle:hover { background: #3a3a3a; }
+
+    #show-matched-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: #aaa;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+
+    #diff-main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #player-panel {
+      flex: 0 0 38%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #2a2a2a;
+    }
+
+    #player-container {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%;
+    }
+
+    #player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #table-wrap {
+      flex: 1;
+      overflow: auto;
+    }
+
+    /* ── Table ─────────────────────────────────────────────────────────────── */
+
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .diff-table th {
+      background: #1a1a1a;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid #333;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .diff-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid #1e1e1e;
+      vertical-align: middle;
+    }
+
+    .col-time {
+      white-space: nowrap;
+      color: #666;
+      font-size: 0.8rem;
+      width: 52px;
+      cursor: pointer;
+    }
+    .col-time:hover { color: #e0e0e0; }
+
+    .col-text {
+      color: #e0e0e0;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .col-speaker {
+      white-space: nowrap;
+      min-width: 100px;
+      font-size: 0.8rem;
+    }
+
+    /* Divider between user and result columns */
+    .col-divider {
+      border-left: 2px solid #2a2a2a;
+    }
+
+    th.col-header-user  { color: #aae; }
+    th.col-header-result { color: #aea; }
+    th.col-header-result.col-divider { border-left-color: #333; }
+
+    /* ── Row types ──────────────────────────────────────────────────────────── */
+
+    /* Matched rows — greyed out by default */
+    .row-match { opacity: 0.3; }
+    .row-match.show-matched { opacity: 1; }
+    .row-match.show-matched .col-text { color: #aaa; }
+
+    /* User-only rows (altered captions without a result counterpart) */
+    .row-user-only { background: #141200; }
+    .row-user-only td { border-bottom-color: #222000; }
+
+    /* Result-only rows (ALTERED_CC — no matching user caption) */
+    .row-result-only { background: #1a0000; }
+    .row-result-only td { border-bottom-color: #2a0000; }
+    .row-result-only td:first-child { border-left: 3px solid #c00; }
+
+    /* Active ALTERED_CC (navigation highlight) */
+    .row-active { background: #200a00 !important; }
+    .row-active td:first-child { border-left: 3px solid #ff6600 !important; }
+
+    /* Currently playing (YouTube sync) */
+    .row-playing { background: #0a1520 !important; }
+    .row-playing td:first-child { border-left: 3px solid #4488cc; }
+    .row-playing.row-match { opacity: 1; }
+    .row-playing.row-match .col-text { color: #aaa; }
+
+    /* Speaker colours */
+    .speaker-user    { color: #aae; }
+    .speaker-result  { color: #aaa; }
+    .speaker-altered { color: #f44336; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="load-screen">
+    <p id="load-msg">Loading…</p>
+  </div>
+
+  <div id="main-screen">
+    <div id="header">
+      <h2 id="title">Reapply Annotations</h2>
+      <span id="summary"></span>
+      <button class="btn-subtle" onclick="jumpToAltered(-1)">↑ Prev ALTERED_CC</button>
+      <button class="btn-subtle" onclick="jumpToAltered(1)">↓ Next ALTERED_CC</button>
+      <label id="show-matched-label">
+        <input type="checkbox" id="show-matched" onchange="toggleMatched()" /> Show matched
+      </label>
+      <label id="use-altered-cc-label" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#aaa;cursor:pointer;user-select:none" title="When unchecked, unmatched captions use the nearest annotation's speaker instead">
+        <input type="checkbox" id="use-altered-cc" checked onchange="reload()" /> Use ALTERED_CC
+      </label>
+      <button class="btn" id="save-btn" onclick="save()">Save</button>
+      <span id="save-msg"></span>
+    </div>
+    <div id="diff-main">
+      <div id="player-panel">
+        <div id="player-container">
+          <div id="player"></div>
+        </div>
+      </div>
+      <div id="table-wrap">
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th class="col-time">Time</th>
+              <th class="col-text col-header-user">User text</th>
+              <th class="col-speaker col-header-user">User speaker</th>
+              <th class="col-text col-header-result col-divider">Result text</th>
+              <th class="col-speaker col-header-result">Result speaker</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params     = new URLSearchParams(location.search);
+    const adminUid   = params.get('user')    || '';
+    const versionUid = params.get('version') || '';
+
+    const POLL_INTERVAL_MS = 250;
+
+    let pageData         = null;
+    let alteredIndices   = [];   // row indices (in alignedRows) of result-only rows
+    let activeAlteredIdx = -1;
+    let ytPlayer         = null;
+    let ytPlayerReady    = false;
+    let rowStarts      = [];   // numeric start time per aligned row (for binary search)
+    let pollTimer      = null;
+    let activeRowIndex = -1;
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+
+    function formatTime(seconds) {
+      const s  = Math.floor(parseFloat(seconds));
+      const m  = Math.floor(s / 60);
+      const h  = Math.floor(m / 60);
+      const ss = String(s % 60).padStart(2, '0');
+      const mm = String(m % 60).padStart(2, '0');
+      return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+    }
+
+    function parseStart(v) {
+      return parseFloat(String(v || '0').trim().replace(/s$/, '')) || 0;
+    }
+
+    function truncate(str, n) {
+      return (str || '').length > n ? str.slice(0, n) + '…' : (str || '');
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function decodeHtml(str) {
+      const el = document.createElement('textarea');
+      el.innerHTML = str;
+      return el.value;
+    }
+
+    function showError(msg) {
+      const screen = document.getElementById('load-screen');
+      screen.innerHTML = `<div class="error-box">${escHtml(msg)}</div>`;
+    }
+
+    // ── Diff alignment ───────────────────────────────────────────────────────
+
+    function buildAlignedRows(userCaptions, resultCaptions, rowMatches) {
+      const rows = [];
+      let userIdx = 0;
+
+      for (let ri = 0; ri < resultCaptions.length; ri++) {
+        const matchedUserIdx = rowMatches[ri];
+
+        if (matchedUserIdx !== null && matchedUserIdx >= userIdx) {
+          // Insert any user captions that come before this match
+          while (userIdx < matchedUserIdx) {
+            rows.push({ type: 'user-only', left: userCaptions[userIdx], right: null });
+            userIdx++;
+          }
+          rows.push({ type: 'match', left: userCaptions[matchedUserIdx], right: resultCaptions[ri] });
+          userIdx = matchedUserIdx + 1;
+        } else {
+          // ALTERED_CC: look ahead to find next match, insert user captions up to that point first
+          let nextMatchUserIdx = userCaptions.length;
+          for (let nri = ri + 1; nri < resultCaptions.length; nri++) {
+            if (rowMatches[nri] !== null && rowMatches[nri] >= userIdx) {
+              nextMatchUserIdx = rowMatches[nri];
+              break;
+            }
+          }
+          while (userIdx < nextMatchUserIdx) {
+            rows.push({ type: 'user-only', left: userCaptions[userIdx], right: null });
+            userIdx++;
+          }
+          rows.push({ type: 'result-only', left: null, right: resultCaptions[ri] });
+        }
+      }
+
+      // Trailing user captions with no result counterpart
+      while (userIdx < userCaptions.length) {
+        rows.push({ type: 'user-only', left: userCaptions[userIdx], right: null });
+        userIdx++;
+      }
+
+      return rows;
+    }
+
+    // ── Rendering ────────────────────────────────────────────────────────────
+
+    function renderTable(data) {
+      const aligned = buildAlignedRows(data.user_captions, data.result_captions, data.row_matches);
+
+      alteredIndices = [];
+      rowStarts    = aligned.map(r => parseStart((r.left || r.right).start));
+
+      const showMatched = document.getElementById('show-matched').checked;
+
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = aligned.map((row, i) => {
+        if (row.type === 'result-only') alteredIndices.push(i);
+
+        const seconds = rowStarts[i];
+        const timeStr = formatTime(seconds);
+
+        const leftText = row.left  ? escHtml(truncate(row.left.text,  55)) : '';
+        const leftSpkr = row.left  ? escHtml(row.left.speaker  || '')      : '';
+        const rightText= row.right ? escHtml(truncate(row.right.text, 55)) : '';
+        const rightSpkr= row.right ? escHtml(row.right.speaker || '')      : '';
+
+        const isAltered    = row.right && row.right.speaker === 'ALTERED_CC';
+        const rightSpkrCls = isAltered ? 'speaker-altered' : 'speaker-result';
+
+        let cls = row.type === 'match'       ? 'row-match' :
+                  row.type === 'user-only'   ? 'row-user-only' :
+                                               'row-result-only';
+        if (row.type === 'match' && showMatched) cls += ' show-matched';
+
+        return `<tr class="${cls}" data-index="${i}">
+          <td class="col-time" onclick="seekTo(${seconds})">${timeStr}</td>
+          <td class="col-text">${leftText}</td>
+          <td class="col-speaker speaker-user">${leftSpkr}</td>
+          <td class="col-text col-divider">${rightText}</td>
+          <td class="col-speaker ${rightSpkrCls}">${rightSpkr}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderSummary(data) {
+      document.getElementById('summary').innerHTML =
+        `<span class="count-match">${data.matched}</span> matched &nbsp;·&nbsp; ` +
+        `<span class="count-altered">${data.altered_cc}</span> ALTERED_CC &nbsp;·&nbsp; ` +
+        `<span class="count-removed">${data.removed}</span> removed &nbsp;·&nbsp; ${data.total} total`;
+    }
+
+    function toggleMatched() {
+      const show = document.getElementById('show-matched').checked;
+      document.querySelectorAll('.row-match').forEach(tr => tr.classList.toggle('show-matched', show));
+    }
+
+    // ── Navigation ───────────────────────────────────────────────────────────
+
+    function setActiveAltered(idx) {
+      activeAlteredIdx = idx;
+      document.querySelectorAll('.row-active').forEach(r => r.classList.remove('row-active'));
+      const rowIdx = alteredIndices[idx];
+      if (rowIdx == null) return;
+      const tr = document.querySelector(`tr[data-index="${rowIdx}"]`);
+      if (!tr) return;
+      tr.classList.add('row-active');
+      tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    function jumpToAltered(direction) {
+      if (!alteredIndices.length) return;
+      const next = activeAlteredIdx + direction;
+      if (next < 0) setActiveAltered(alteredIndices.length - 1);
+      else if (next >= alteredIndices.length) setActiveAltered(0);
+      else setActiveAltered(next);
+    }
+
+    // ── YouTube player ───────────────────────────────────────────────────────
+
+    function seekTo(seconds) {
+      if (ytPlayer && ytPlayerReady) {
+        ytPlayer.seekTo(seconds, true);
+        ytPlayer.playVideo();
+      }
+    }
+
+    function loadYouTubeAPI() {
+      return new Promise(resolve => {
+        if (window.YT && window.YT.Player) { resolve(); return; }
+        window.onYouTubeIframeAPIReady = resolve;
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      });
+    }
+
+    async function initPlayer(videoId) {
+      await loadYouTubeAPI();
+      ytPlayerReady = false;
+      ytPlayer = new YT.Player('player', {
+        videoId,
+        playerVars: { rel: 0, modestbranding: 1 },
+        events: { onReady: () => { ytPlayerReady = true; startPolling(); } },
+      });
+    }
+
+    // ── Caption sync ─────────────────────────────────────────────────────────
+
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(syncCaption, POLL_INTERVAL_MS);
+    }
+
+    function syncCaption() {
+      if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
+      const t = ytPlayer.getCurrentTime();
+
+      // Binary search: last row whose start <= t
+      let lo = 0, hi = rowStarts.length - 1, found = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (rowStarts[mid] <= t) { found = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+
+      if (found === activeRowIndex) return;
+
+      if (activeRowIndex !== -1) {
+        const prev = document.querySelector(`tr[data-index="${activeRowIndex}"]`);
+        if (prev) prev.classList.remove('row-playing');
+      }
+
+      activeRowIndex = found;
+      if (found === -1) return;
+
+      const tr = document.querySelector(`tr[data-index="${found}"]`);
+      if (!tr) return;
+      tr.classList.add('row-playing');
+      tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    // ── Save ─────────────────────────────────────────────────────────────────
+
+    async function save() {
+      const btn = document.getElementById('save-btn');
+      const msg = document.getElementById('save-msg');
+      btn.disabled    = true;
+      btn.textContent = 'Saving…';
+      msg.textContent = '';
+      msg.className   = '';
+
+      try {
+        const res = await fetch('./transcripts.py', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            id:       pageData.youtube_id,
+            title:    pageData.episode_title,
+            user_uid: pageData.user_uid,
+            captions: pageData.result_captions,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = `Saved as version ${data.version}`;
+          msg.className   = 'save-success';
+        } else {
+          msg.textContent = `Error: ${data.error}`;
+          msg.className   = 'save-error';
+        }
+      } catch (e) {
+        msg.textContent = String(e);
+        msg.className   = 'save-error';
+      }
+
+      btn.disabled    = false;
+      btn.textContent = 'Save';
+    }
+
+    // ── Load ─────────────────────────────────────────────────────────────────
+
+    async function reload() {
+      document.getElementById('save-msg').textContent = '';
+      await load();
+    }
+
+    async function load() {
+      if (!adminUid || !versionUid) {
+        showError('Missing required URL parameters: user and version');
+        return;
+      }
+
+      const useAlteredCc = document.getElementById('use-altered-cc')?.checked ?? true;
+
+      try {
+        const res  = await fetch(`./reapply.py?user=${encodeURIComponent(adminUid)}&version=${encodeURIComponent(versionUid)}&altered_cc=${useAlteredCc ? '1' : '0'}`);
+        const data = await res.json();
+        if (!res.ok) { showError(data.error); return; }
+
+        const viewerUrl = `viewer.html?user=${encodeURIComponent(data.user_uid)}&episode=${encodeURIComponent(data.episode_uid || '')}`;
+        document.getElementById('title').innerHTML =
+          `<a href="${escHtml(viewerUrl)}" target="_blank" style="color:inherit;text-decoration:none;" title="Open in viewer">` +
+          escHtml(decodeHtml(data.episode_title || 'Reapply')) + '</a>' +
+          `<span>${escHtml(data.user_name || '')}</span>`;
+
+        pageData = data;
+        renderSummary(data);
+        renderTable(data);
+
+        document.getElementById('load-screen').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'flex';
+
+        if (data.youtube_id && !ytPlayer) initPlayer(data.youtube_id);
+      } catch (e) {
+        showError(String(e));
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
