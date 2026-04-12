@@ -31,7 +31,9 @@ CREATE TABLE episodes (
 CREATE TABLE users (
     uid      VARCHAR(8)   NOT NULL,
     email    VARCHAR(255) NOT NULL,
-    name     VARCHAR(255),
+    name            VARCHAR(255)  NOT NULL,
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_anonymous    TINYINT(1)   DEFAULT NULL,
     location        VARCHAR(255),
     is_admin        TINYINT(1)   DEFAULT NULL,
     is_test_account TINYINT(1)   DEFAULT NULL,

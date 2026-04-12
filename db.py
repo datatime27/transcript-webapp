@@ -27,7 +27,7 @@ def get_db_connection():
     """Open and return a MySQLdb connection using credentials from db.ini."""
     cfg = configparser.ConfigParser()
     cfg.read(_config_path)
-    c = cfg["client"]
+    c = cfg["mysql"]
     return MySQLdb.connect(
         host=c["host"],
         user=c["user"],
@@ -36,23 +36,24 @@ def get_db_connection():
     )
 
 
-def create_user(email, name=None, is_test_account=None, location=None):
+def create_user(email, name=None, is_test_account=None, location=None, is_anonymous=None):
     """
     Create a new user and return their generated uid.
 
     Args:
         email           : the user's email address (must be unique)
-        name            : optional display name
+        name            : display name (required if not anonymous)
         is_test_account : optional flag to mark as a test account
         location        : optional location string
+        is_anonymous    : optional flag to mark as anonymous
     """
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         uid = generate_uid(cur, "users")
         cur.execute(
-            "INSERT INTO users (uid, email, name, is_test_account, location) VALUES (%s, %s, %s, %s, %s)",
-            (uid, email, name, is_test_account, location),
+            "INSERT INTO users (uid, email, name, is_anonymous, is_test_account, location) VALUES (%s, %s, %s, %s, %s, %s)",
+            (uid, email, name, is_anonymous, is_test_account, location),
         )
         conn.commit()
         return uid
