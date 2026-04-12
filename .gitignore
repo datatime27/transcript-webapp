@@ -20,6 +20,7 @@ viewer-test.html
 preprocess/audio/
 preprocess/tmp-outputs/
 preprocess/__pycache__/
+preprocess/*.json
 __pycache__/
 
 # Claude Code
