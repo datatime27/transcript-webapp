@@ -315,27 +315,27 @@
     .episode-user-tag, a.episode-user-tag:visited {
       font-size: 0.75rem;
       padding: 2px 8px;
-      background: #2a2a1e;
-      color: #d6d0a7;
-      border: 1px solid #4a461e;
+      background: #5a5200;
+      color: #f5e878;
+      border: 1px solid #7a7000;
       border-radius: 4px;
       text-decoration: none;
     }
-    a.episode-user-tag:hover { background: #3a3a25; }
+    a.episode-user-tag:hover { background: #6a6200; }
 
     .episode-user-tag.completed, a.episode-user-tag.completed:visited {
-      background: #1e2a1e;
-      color: #a5d6a7;
-      border-color: #2a4a2a;
+      background: #1a4d22;
+      color: #9ee8a0;
+      border-color: #276630;
     }
-    a.episode-user-tag.completed:hover { background: #253a25; }
+    a.episode-user-tag.completed:hover { background: #215c2a; }
 
     .episode-user-tag.unstarted, a.episode-user-tag.unstarted:visited {
-      background: #2a1e1e;
-      color: #d6a7a7;
-      border-color: #333;
+      background: #5a1a1a;
+      color: #f5a0a0;
+      border-color: #7a2a2a;
     }
-    a.episode-user-tag.unstarted:hover { background: #252525; }
+    a.episode-user-tag.unstarted:hover { background: #6a2020; }
 
     .episode-no-users {
       font-size: 0.78rem;
@@ -598,8 +598,9 @@ Alex Horne</textarea>
 
     function renderEpisodeRow(ep) {
       const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
+      const tagOrder = u => u.version_number == null ? 0 : u.is_complete ? 2 : 1;
       const users = visibleUsers.length
-        ? visibleUsers.map(u => {
+        ? visibleUsers.slice().sort((a, b) => tagOrder(a) - tagOrder(b)).map(u => {
             const cls     = u.version_number == null ? 'episode-user-tag unstarted'
                           : u.is_complete             ? 'episode-user-tag completed'
                           :                             'episode-user-tag';
@@ -641,7 +642,7 @@ Alex Horne</textarea>
 
       if (completedEps.length) {
         html += `<div class="completed-seasons-toggle" onclick="toggleCompletedSeasons()">
-          ▶ Completed seasons (<span id="completed-season-count"></span>)
+          <span id="completed-seasons-arrow">▶</span> Completed seasons (<span id="completed-season-count"></span>)
         </div>
         <div id="completed-seasons" style="display:none">${buildSeasonBlocks(completedEps)}</div>`;
       }
@@ -659,7 +660,7 @@ Alex Horne</textarea>
       const toggle = document.querySelector('.completed-seasons-toggle');
       const open   = panel.style.display === 'none';
       panel.style.display = open ? '' : 'none';
-      toggle.firstChild.textContent = open ? '▼ ' : '▶ ';
+      document.getElementById('completed-seasons-arrow').textContent = open ? '▼' : '▶';
     }
 
     function renderRecentVersions(versions) {
