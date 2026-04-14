@@ -38,6 +38,7 @@ CREATE TABLE users (
     is_admin        TINYINT(1)   DEFAULT NULL,
     is_test_account TINYINT(1)   DEFAULT NULL,
     wants_more      TINYINT(1)   DEFAULT NULL,
+    active          TINYINT(1)   NOT NULL DEFAULT 1,
     PRIMARY KEY (uid),
     UNIQUE KEY uq_email (email)
 );
@@ -63,6 +64,13 @@ CREATE TABLE versions (
     UNIQUE  KEY uq_version (episode_uid, user_uid, version_number),
     FOREIGN KEY (episode_uid) REFERENCES episodes(uid),
     FOREIGN KEY (user_uid)    REFERENCES users(uid)
+);
+
+CREATE TABLE locations (
+    location   VARCHAR(255) NOT NULL,
+    season_uid VARCHAR(8)   NOT NULL,
+    PRIMARY KEY (location),
+    FOREIGN KEY (season_uid) REFERENCES seasons(uid)
 );
 
 CREATE TABLE speaker_associations (

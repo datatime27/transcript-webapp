@@ -22,7 +22,8 @@ try:
     from datetime import datetime, timezone
     from pathlib import Path
     from urllib.parse import parse_qs
-    from db import get_episodes_for_user, get_user_name, get_version, insert_version, set_episode_complete, set_wants_more
+    from db import get_episodes_for_user, get_user_info, get_user_name, get_version, insert_version, set_episode_complete, set_wants_more
+    from mail import get_admin_email, send_email
 
 
     def valid_id(uid):
@@ -80,6 +81,28 @@ try:
         except Exception:
             status = "400 Bad Request"
             body   = json.dumps({"error": "Invalid JSON body"})
+            return
+
+        action = data.get("action", "")
+
+        if action == "wants_more":
+            user_uid = str(data.get("user_uid", "") or "").strip() or None
+            if not user_uid or not valid_id(user_uid):
+                status = "400 Bad Request"
+                body   = json.dumps({"error": "Invalid or missing user_uid"})
+                return
+            set_wants_more(user_uid, True)
+            info = get_user_info(user_uid) or {}
+            user_name = info.get("name") or user_uid
+            user_email = info.get("email") or "unknown"
+            user_location = info.get("location") or "unknown"
+            admin_email = get_admin_email()
+            send_email(
+                to      = admin_email,
+                subject = f"{user_name} is ready for a new episode",
+                body    = f"**{user_name}** has clicked 'I'm ready for a new episode'.\n\n**Email:** {user_email}\n**Location:** {user_location}\n\nAssign them a new episode when one is available.",
+            )
+            body = json.dumps({"ok": True})
             return
 
         video_id    = str(data.get("id",          "") or "").strip()

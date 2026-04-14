@@ -120,6 +120,19 @@
 
     .load-btn:hover { background: #cc0000; }
 
+    #wants-more-btn {
+      padding: 12px 28px;
+      background: #2a2a2a;
+      color: #bbb;
+      border: 1px solid #555;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #wants-more-btn:hover { background: #333; color: #e0e0e0; }
+    #wants-more-msg { color: #4caf50; font-size: 0.9rem; margin-top: 8px; }
+
     #transcript-select {
       padding: 10px 14px;
       background: #1a1a1a;
@@ -664,7 +677,11 @@
   <select id="transcript-select" style="display:none">
     <option value="">— choose a transcript —</option>
   </select>
-  <button class="load-btn" id="load-btn" style="display:none">Open</button>
+  <div id="load-actions" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="load-btn" id="load-btn">Open</button>
+    <button id="wants-more-btn">I'm ready for a new episode</button>
+  </div>
+  <p id="wants-more-msg" style="display:none">You will receive an email when your new episode is ready</p>
   <p id="load-error" style="color:#f44336;display:none;"></p>
 
   <div id="help-panel">
@@ -753,10 +770,29 @@
     <button id="help-btn" title="Help">?</button>
     <button id="settings-btn" title="Settings">⚙</button>
     <div id="settings-popup">
-      <h3>Settings</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Settings</h3>
+        <button id="reset-all-settings" class="reset-btn">Reset all</button>
+      </div>
       <div class="setting-row">
-        <label>Scroll delay <span id="scroll-delay-val"></span></label>
-        <input type="range" id="scroll-delay-slider" min="0" max="1000" step="50" />
+        <label title="How long to wait after the active caption changes before auto-scrolling begins">Scroll delay <span id="scroll-delay-val"></span></label>
+        <input type="range" id="scroll-delay-slider" min="0" max="3000" step="50" title="How long to wait after the active caption changes before scrolling to it" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="How often the transcript highlight is synced with the video playback position">Poll interval <span id="poll-interval-val"></span></label>
+        <input type="range" id="poll-interval-slider" min="50" max="3000" step="50" title="How often the transcript's active caption is synced with the video playback position" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="Animation duration when scrolling a short distance (below the cutoff)">Scroll duration (near) <span id="scroll-duration-near-val"></span></label>
+        <input type="range" id="scroll-duration-near-slider" min="100" max="3000" step="50" title="Animation duration when scrolling a short distance (below the cutoff)" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="Animation duration when scrolling a long distance (above the cutoff)">Scroll duration (far) <span id="scroll-duration-far-val"></span></label>
+        <input type="range" id="scroll-duration-far-slider" min="50" max="3000" step="50" title="Animation duration when scrolling a long distance (above the cutoff)" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="Pixel distance that determines whether the near or far scroll duration is used">Scroll distance cutoff <span id="scroll-distance-cutoff-val"></span></label>
+        <input type="range" id="scroll-distance-cutoff-slider" min="50" max="1000" step="25" title="Pixel distance that determines whether the near or far scroll duration is used" />
       </div>
       <div class="setting-row" style="margin-top:12px;">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -769,7 +805,6 @@
       <div class="setting-row" style="margin-top:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <label>Speaker colors &amp; keys</label>
-          <button id="reset-speaker-settings" class="reset-btn">Reset</button>
         </div>
         <div id="speaker-color-rows" style="margin-top:6px;"></div>
       </div>
@@ -827,11 +862,11 @@
   applySpeakerColors();
 
   // ── Animation constants ────────────────────────────────────────────────────
-  const POLL_INTERVAL_MS       = 150;  // how often to sync transcript highlight with video
-  let   SCROLL_DELAY_MS        = parseInt(localStorage.getItem('scrollDelayMs') ?? '200', 10); // pause before auto-scroll begins after active caption changes; user-configurable
-  const SCROLL_DURATION_SLOW   = 800;  // animation duration (ms) for small scroll distances
-  const SCROLL_DURATION_FAST   = 300;  // animation duration (ms) for large scroll distances
-  const SCROLL_DISTANCE_CUTOFF = 300;  // pixel threshold between slow and fast scroll
+  let POLL_INTERVAL_MS       = parseInt(localStorage.getItem('pollIntervalMs')      ?? '150', 10); // how often to sync transcript highlight with video; user-configurable
+  let SCROLL_DELAY_MS        = parseInt(localStorage.getItem('scrollDelayMs')       ?? '200', 10); // pause before auto-scroll begins after active caption changes; user-configurable
+  let SCROLL_DURATION_NEAR   = parseInt(localStorage.getItem('scrollDurationNear')  ?? '800', 10); // animation duration (ms) for small scroll distances; user-configurable
+  let SCROLL_DURATION_FAR   = parseInt(localStorage.getItem('scrollDurationFar')  ?? '300', 10); // animation duration (ms) for large scroll distances; user-configurable
+  let SCROLL_DISTANCE_CUTOFF = parseInt(localStorage.getItem('scrollDistanceCutoff')?? '300', 10); // pixel threshold between slow and fast scroll; user-configurable
   const SAVE_FEEDBACK_MS       = 3000; // how long to show save success/error on the button
   const USER_SCROLL_TIMEOUT_MS = 3000; // how long after manual scroll before auto-scroll resumes
   const TOAST_DURATION_MS      = 5000; // how long the apply-all toast stays before auto-dismissing
@@ -967,7 +1002,7 @@
       const next = e.code === 'ArrowUp' ? activeIndex - 1 : activeIndex + 1;
       if (next >= 0 && next < captions.length) {
         activateCaption(next);
-        seekTo(parseStart(captions[next].start));
+        seekTo(parseStart(captions[next].start), ytPlayer.getPlayerState() === YT.PlayerState.PLAYING);
       }
     } else if (speakerKeys.includes(e.key)) {
       const speaker = SPEAKERS[speakerKeys.indexOf(e.key)];
@@ -1195,7 +1230,7 @@
         textSpan.className = 'caption-text';
         textSpan.textContent = cap.text;
 
-        textSpan.addEventListener('click', e => {
+        textSpan.addEventListener('dblclick', e => {
           e.stopPropagation();
           if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
           textSpan.contentEditable = 'true';
@@ -1277,7 +1312,7 @@
       const panelRect = panel.getBoundingClientRect();
       const targetScroll = panel.scrollTop + (elRect.top - panelRect.top) - panel.clientHeight / 2 + el.offsetHeight / 2;
       const distance = Math.abs(targetScroll - panel.scrollTop);
-      const duration = distance < SCROLL_DISTANCE_CUTOFF ? SCROLL_DURATION_SLOW : SCROLL_DURATION_FAST;
+      const duration = distance < SCROLL_DISTANCE_CUTOFF ? SCROLL_DURATION_NEAR : SCROLL_DURATION_FAR;
       const startScroll = panel.scrollTop;
       const delta = targetScroll - startScroll;
       if (scrollAnimFrame) cancelAnimationFrame(scrollAnimFrame);
@@ -1363,8 +1398,9 @@
 
   async function fetchTranscriptList() {
     const statusEl = document.getElementById('load-status');
-    const selectEl = document.getElementById('transcript-select');
-    const btnEl    = document.getElementById('load-btn');
+    const selectEl     = document.getElementById('transcript-select');
+    const btnEl        = document.getElementById('load-btn');
+    const actionsEl    = document.getElementById('load-actions');
     try {
       const url = `./transcripts.py?user=${encodeURIComponent(userUid)}`;
       const res = await fetch(url);
@@ -1373,6 +1409,8 @@
       if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
       if (!list.length) {
         statusEl.textContent = 'No available transcripts currently assigned to you.';
+        actionsEl.style.display = 'flex';
+        btnEl.style.display = 'none';
         return;
       }
       const episodeSelectEl = document.getElementById('episode-select');
@@ -1400,7 +1438,7 @@
 
       statusEl.style.display = 'none';
       selectEl.style.display = 'block';
-      btnEl.style.display = 'block';
+      actionsEl.style.display = 'flex';
       if (autoEntry) {
         selectEl.value = autoEntry.version_id;
       }
@@ -1427,6 +1465,28 @@
       await fetchAndLoad(id, version);
     } catch (err) {
       showLoadError(`Could not load transcript: ${err.message}`);
+    }
+  });
+
+  document.getElementById('wants-more-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('wants-more-btn');
+    const msg = document.getElementById('wants-more-msg');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    try {
+      const res = await fetch('./transcripts.py', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wants_more', user_uid: userUid }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Server returned ${res.status}`);
+      btn.style.display = 'none';
+      msg.style.display = 'block';
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "I'm ready for a new episode";
+      showLoadError(`Could not send request: ${err.message}`);
     }
   });
 
@@ -1566,6 +1626,52 @@
     scrollDelayVal.textContent = `${ms}ms`;
   }
 
+  const pollIntervalSlider       = document.getElementById('poll-interval-slider');
+  const pollIntervalVal          = document.getElementById('poll-interval-val');
+  const scrollDurationNearSlider = document.getElementById('scroll-duration-near-slider');
+  const scrollDurationNearVal    = document.getElementById('scroll-duration-near-val');
+  const scrollDurationFarSlider = document.getElementById('scroll-duration-far-slider');
+  const scrollDurationFarVal    = document.getElementById('scroll-duration-far-val');
+  const scrollDistanceCutoffSlider = document.getElementById('scroll-distance-cutoff-slider');
+  const scrollDistanceCutoffVal    = document.getElementById('scroll-distance-cutoff-val');
+
+  function updatePollInterval(ms) {
+    POLL_INTERVAL_MS = ms;
+    localStorage.setItem('pollIntervalMs', ms);
+    pollIntervalSlider.value = ms;
+    pollIntervalVal.textContent = `${ms}ms`;
+    if (pollInterval !== null) {
+      clearInterval(pollInterval);
+      pollInterval = setInterval(syncTranscript, POLL_INTERVAL_MS);
+    }
+  }
+
+  function updateScrollDurationNear(ms) {
+    SCROLL_DURATION_NEAR = ms;
+    localStorage.setItem('scrollDurationNear', ms);
+    scrollDurationNearSlider.value = ms;
+    scrollDurationNearVal.textContent = `${ms}ms`;
+  }
+
+  function updateScrollDurationFar(ms) {
+    SCROLL_DURATION_FAR = ms;
+    localStorage.setItem('scrollDurationFar', ms);
+    scrollDurationFarSlider.value = ms;
+    scrollDurationFarVal.textContent = `${ms}ms`;
+  }
+
+  function updateScrollDistanceCutoff(px) {
+    SCROLL_DISTANCE_CUTOFF = px;
+    localStorage.setItem('scrollDistanceCutoff', px);
+    scrollDistanceCutoffSlider.value = px;
+    scrollDistanceCutoffVal.textContent = `${px}px`;
+  }
+
+  pollIntervalSlider.addEventListener('input',         () => updatePollInterval(parseInt(pollIntervalSlider.value, 10)));
+  scrollDurationNearSlider.addEventListener('input',   () => updateScrollDurationNear(parseInt(scrollDurationNearSlider.value, 10)));
+  scrollDurationFarSlider.addEventListener('input',   () => updateScrollDurationFar(parseInt(scrollDurationFarSlider.value, 10)));
+  scrollDistanceCutoffSlider.addEventListener('input', () => updateScrollDistanceCutoff(parseInt(scrollDistanceCutoffSlider.value, 10)));
+
   function updateSloMoRate(rate) {
     slowMoRate = rate;
     localStorage.setItem('slowMoRate', rate);
@@ -1591,6 +1697,10 @@
   slomoSlider.addEventListener('input', () => updateSloMoRate(parseFloat(slomoSlider.value)));
 
   updateScrollDelay(SCROLL_DELAY_MS);
+  updatePollInterval(POLL_INTERVAL_MS);
+  updateScrollDurationNear(SCROLL_DURATION_NEAR);
+  updateScrollDurationFar(SCROLL_DURATION_FAR);
+  updateScrollDistanceCutoff(SCROLL_DISTANCE_CUTOFF);
   updateSloMoRate(slowMoRate);
 
   function renderSpeakerColorPickers() {
@@ -1671,8 +1781,17 @@
     if (opening) renderSpeakerColorPickers();
   });
 
-  document.getElementById('reset-speaker-settings').addEventListener('click', e => {
+  document.getElementById('reset-all-settings').addEventListener('click', e => {
     e.stopPropagation();
+    updateScrollDelay(200);
+    updatePollInterval(150);
+    updateScrollDurationNear(800);
+    updateScrollDurationFar(300);
+    updateScrollDistanceCutoff(300);
+    updateSloMoRate(DEFAULT_SLOMO_RATE);
+    slowMoKey = DEFAULT_SLOMO_KEY;
+    slomoKeyInput.value = slowMoKey;
+    localStorage.setItem('slowMoKey', slowMoKey);
     speakerColors  = [...DEFAULT_SPEAKER_COLORS];
     speakerKeys    = [...DEFAULT_SPEAKER_KEYS];
     prevSpeakerKey = DEFAULT_PREV_SPEAKER_KEY;

@@ -120,6 +120,19 @@
 
     .load-btn:hover { background: #cc0000; }
 
+    #wants-more-btn {
+      padding: 12px 28px;
+      background: #2a2a2a;
+      color: #bbb;
+      border: 1px solid #555;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #wants-more-btn:hover { background: #333; color: #e0e0e0; }
+    #wants-more-msg { color: #4caf50; font-size: 0.9rem; margin-top: 8px; }
+
     #transcript-select {
       padding: 10px 14px;
       background: #1a1a1a;
@@ -664,7 +677,11 @@
   <select id="transcript-select" style="display:none">
     <option value="">— choose a transcript —</option>
   </select>
-  <button class="load-btn" id="load-btn" style="display:none">Open</button>
+  <div id="load-actions" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="load-btn" id="load-btn">Open</button>
+    <button id="wants-more-btn">I'm ready for a new episode</button>
+  </div>
+  <p id="wants-more-msg" style="display:none">You will receive an email when your new episode is ready</p>
   <p id="load-error" style="color:#f44336;display:none;"></p>
 
   <div id="help-panel">
@@ -967,7 +984,7 @@
       const next = e.code === 'ArrowUp' ? activeIndex - 1 : activeIndex + 1;
       if (next >= 0 && next < captions.length) {
         activateCaption(next);
-        seekTo(parseStart(captions[next].start));
+        seekTo(parseStart(captions[next].start), ytPlayer.getPlayerState() === YT.PlayerState.PLAYING);
       }
     } else if (speakerKeys.includes(e.key)) {
       const speaker = SPEAKERS[speakerKeys.indexOf(e.key)];
@@ -1195,7 +1212,7 @@
         textSpan.className = 'caption-text';
         textSpan.textContent = cap.text;
 
-        textSpan.addEventListener('click', e => {
+        textSpan.addEventListener('dblclick', e => {
           e.stopPropagation();
           if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
           textSpan.contentEditable = 'true';
@@ -1363,8 +1380,9 @@
 
   async function fetchTranscriptList() {
     const statusEl = document.getElementById('load-status');
-    const selectEl = document.getElementById('transcript-select');
-    const btnEl    = document.getElementById('load-btn');
+    const selectEl     = document.getElementById('transcript-select');
+    const btnEl        = document.getElementById('load-btn');
+    const actionsEl    = document.getElementById('load-actions');
     try {
       const url = `./transcripts.py?user=${encodeURIComponent(userUid)}`;
       const res = await fetch(url);
@@ -1373,6 +1391,8 @@
       if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
       if (!list.length) {
         statusEl.textContent = 'No available transcripts currently assigned to you.';
+        actionsEl.style.display = 'flex';
+        btnEl.style.display = 'none';
         return;
       }
       const episodeSelectEl = document.getElementById('episode-select');
@@ -1400,7 +1420,7 @@
 
       statusEl.style.display = 'none';
       selectEl.style.display = 'block';
-      btnEl.style.display = 'block';
+      actionsEl.style.display = 'flex';
       if (autoEntry) {
         selectEl.value = autoEntry.version_id;
       }
@@ -1427,6 +1447,28 @@
       await fetchAndLoad(id, version);
     } catch (err) {
       showLoadError(`Could not load transcript: ${err.message}`);
+    }
+  });
+
+  document.getElementById('wants-more-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('wants-more-btn');
+    const msg = document.getElementById('wants-more-msg');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    try {
+      const res = await fetch('./transcripts.py', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wants_more', user_uid: userUid }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Server returned ${res.status}`);
+      btn.style.display = 'none';
+      msg.style.display = 'block';
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "I'm ready for a new episode";
+      showLoadError(`Could not send request: ${err.message}`);
     }
   });
 

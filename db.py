@@ -52,7 +52,7 @@ def create_user(email, name=None, is_test_account=None, location=None, is_anonym
         cur = conn.cursor()
         uid = generate_uid(cur, "users")
         cur.execute(
-            "INSERT INTO users (uid, email, name, is_anonymous, is_test_account, location) VALUES (%s, %s, %s, %s, %s, %s)",
+            "INSERT INTO users (uid, email, name, is_anonymous, is_test_account, location, wants_more) VALUES (%s, %s, %s, %s, %s, %s, 1)",
             (uid, email, name, is_anonymous, is_test_account, location),
         )
         conn.commit()
@@ -222,13 +222,57 @@ def get_user_name(user_uid):
         conn.close()
 
 
+def get_user_episode_count(user_uid):
+    """Return the number of episodes assigned to a user."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM user_episodes WHERE user_uid = %s", (user_uid,))
+        return cur.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def get_episode_info(episode_uid):
+    """Return {show_name, season_number, episode_number, youtube_id} for an episode, or None if not found."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT shows.name, seasons.number, episodes.number, episodes.youtube_id
+            FROM episodes
+              JOIN seasons ON seasons.uid = episodes.season_uid
+              JOIN shows ON shows.uid = seasons.show_uid
+            WHERE episodes.uid = %s
+            """,
+            (episode_uid,),
+        )
+        row = cur.fetchone()
+        return {"show_name": row[0], "season_number": row[1], "episode_number": row[2], "youtube_id": row[3]} if row else None
+    finally:
+        conn.close()
+
+
+def get_user_info(user_uid):
+    """Return {name, email, location} for a user, or None if not found."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT name, email, location FROM users WHERE uid = %s", (user_uid,))
+        row = cur.fetchone()
+        return {"name": row[0], "email": row[1], "location": row[2]} if row else None
+    finally:
+        conn.close()
+
+
 def get_all_users():
     """Return all users ordered by name."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT uid, email, name, is_admin, is_test_account, location, wants_more FROM users ORDER BY name",
+            "SELECT uid, email, name, is_admin, is_test_account, location, wants_more, active FROM users ORDER BY name",
         )
         return [
             {
@@ -239,6 +283,7 @@ def get_all_users():
                 "is_test_account": bool(row[4]),
                 "location":        row[5],
                 "wants_more":      bool(row[6]),
+                "active":          bool(row[7]),
             }
             for row in cur.fetchall()
         ]
@@ -252,7 +297,7 @@ def get_all_episodes():
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT e.youtube_id, e.title, s.name, season.number, e.number
+            """SELECT e.uid, e.youtube_id, e.title, s.name, season.number, e.number
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -260,11 +305,12 @@ def get_all_episodes():
         )
         return [
             {
-                "youtube_id": row[0],
-                "title":      row[1],
-                "show":       row[2],
-                "season":     row[3],
-                "episode":    row[4],
+                "uid":        row[0],
+                "youtube_id": row[1],
+                "title":      row[2],
+                "show":       row[3],
+                "season":     row[4],
+                "episode":    row[5],
             }
             for row in cur.fetchall()
         ]
@@ -272,30 +318,11 @@ def get_all_episodes():
         conn.close()
 
 
-def add_episode_to_user(email, youtube_id):
-    """
-    Assign an episode to a user, looked up by email and YouTube video ID.
-
-    Args:
-        email      : the user's email address
-        youtube_id : the YouTube video ID of the episode
-    """
+def add_episode_to_user(user_uid, episode_uid):
+    """Assign an episode to a user by UID and clear their wants_more flag."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-
-        cur.execute("SELECT uid FROM users WHERE email = %s", (email,))
-        row = cur.fetchone()
-        if not row:
-            raise ValueError("No user found with that email")
-        user_uid = row[0]
-
-        cur.execute("SELECT uid FROM episodes WHERE youtube_id = %s", (youtube_id,))
-        row = cur.fetchone()
-        if not row:
-            raise ValueError(f"No episode found with YouTube ID: {youtube_id}")
-        episode_uid = row[0]
-
         cur.execute(
             "INSERT IGNORE INTO user_episodes (user_uid, episode_uid) VALUES (%s, %s)",
             (user_uid, episode_uid),
@@ -390,7 +417,7 @@ def get_episodes_for_user(user_uid):
                )
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
-               WHERE ue.user_uid = %s AND (season.is_complete IS NULL OR season.is_complete = 0)
+               WHERE ue.user_uid = %s AND IFNULL(season.is_complete, 0) = 0
                ORDER BY s.name, season.number, e.number""",
             (user_uid,),
         )
@@ -513,6 +540,146 @@ def set_wants_more(user_uid, value):
             "UPDATE users SET wants_more = %s WHERE uid = %s",
             (1 if value else None, user_uid),
         )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_all_locations():
+    """Return all rows from the locations table with show name and season number."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT l.location, sh.name, se.number
+            FROM locations l
+            JOIN seasons se ON se.uid = l.season_uid
+            JOIN shows sh ON sh.uid = se.show_uid
+            ORDER BY sh.name, se.number, l.location
+            """,
+        )
+        return [
+            {"location": row[0], "show_name": row[1], "season_number": row[2]}
+            for row in cur.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
+def get_all_seasons():
+    """Return all seasons with their show name, ordered by show then season number."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT se.uid, sh.name, se.number
+            FROM seasons se
+            JOIN shows sh ON sh.uid = se.show_uid
+            ORDER BY sh.name, se.number
+            """,
+        )
+        return [
+            {"uid": row[0], "show_name": row[1], "season_number": row[2]}
+            for row in cur.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
+def get_wants_more_suggestions():
+    """For each user with wants_more=1, return the best next episode to assign.
+
+    Returns a dict keyed by user_uid. Each value is either:
+      {episode_uid, title, youtube_id, assigned_count}  — the suggested episode
+      None                                               — nothing available
+    """
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("SELECT uid, location FROM users WHERE wants_more = 1")
+        users = cur.fetchall()
+        if not users:
+            return {}
+
+        cur.execute("SELECT location, season_uid FROM locations")
+        location_map = {row[0]: row[1] for row in cur.fetchall()}
+        us_season_uid = location_map.get("US")
+
+        # Resolve each user's season_uid in Python using the in-memory map
+        user_season = {}
+        for user_uid, location in users:
+            season_uid = (location_map.get(location) if location else None) or us_season_uid
+            user_season[user_uid] = season_uid
+
+        # Fetch episodes already assigned to each wants_more user
+        user_uids = [u[0] for u in users]
+        placeholders_users = ','.join(['%s'] * len(user_uids))
+        cur.execute(
+            f"SELECT user_uid, episode_uid FROM user_episodes WHERE user_uid IN ({placeholders_users})",
+            user_uids,
+        )
+        assigned = {}
+        for user_uid, episode_uid in cur.fetchall():
+            assigned.setdefault(user_uid, set()).add(episode_uid)
+
+        # One query for all candidates across distinct season_uids, ordered by fewest assigned
+        needed = {s for s in user_season.values() if s}
+        candidates_by_season = {}
+        if needed:
+            placeholders = ','.join(['%s'] * len(needed))
+            cur.execute(
+                f"""
+                SELECT episodes.season_uid, episodes.uid, shows.name, seasons.number, episodes.number, COUNT(users.uid) AS cnt
+                FROM episodes
+                  JOIN seasons ON seasons.uid = episodes.season_uid
+                  JOIN shows ON shows.uid = seasons.show_uid
+                  LEFT JOIN user_episodes ue ON ue.episode_uid = episodes.uid
+                  LEFT JOIN users ON users.uid = ue.user_uid
+                    AND IFNULL(users.is_admin, 0) = 0
+                    AND IFNULL(users.is_test_account, 0) = 0
+                WHERE episodes.season_uid IN ({placeholders})
+                GROUP BY episodes.season_uid, episodes.uid, shows.name, seasons.number, episodes.number
+                HAVING cnt < 4
+                ORDER BY episodes.season_uid, cnt ASC, episodes.number ASC
+                """,
+                list(needed),
+            )
+            for row in cur.fetchall():
+                candidates_by_season.setdefault(row[0], []).append({
+                    "episode_uid": row[1], "show_name": row[2],
+                    "season_number": row[3], "episode_number": row[4],
+                })
+
+        result = {}
+        for user_uid, season_uid in user_season.items():
+            user_assigned = assigned.get(user_uid, set())
+            candidates = candidates_by_season.get(season_uid, [])
+            result[user_uid] = next(
+                (c for c in candidates if c["episode_uid"] not in user_assigned),
+                None,
+            )
+        return result
+    finally:
+        conn.close()
+
+
+def set_location_season(location, season_uid):
+    """Update the season_uid for a location row."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE locations SET season_uid = %s WHERE location = %s",
+            (season_uid, location),
+        )
+        if cur.rowcount == 0:
+            raise ValueError(f"Location not found: {location!r}")
         conn.commit()
     except Exception:
         conn.rollback()

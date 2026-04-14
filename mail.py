@@ -50,6 +50,11 @@ def _markdown_to_html(text):
     return "\n".join(html_paragraphs)
 
 
+def get_admin_email():
+    """Return the admin/notification email address from db.ini."""
+    return _get_mail_config()["user"]
+
+
 def send_email(to, subject, body):
     """Send a plain-text + HTML multipart email.
 
@@ -63,6 +68,7 @@ def send_email(to, subject, body):
     msg = MIMEMultipart("alternative")
     msg["From"]    = f"{c['name']} <{c['user']}>"
     msg["To"]      = to
+    msg["Bcc"]     = c["user"]
     msg["Subject"] = subject
 
     msg.attach(MIMEText(body, "plain"))

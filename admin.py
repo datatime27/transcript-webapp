@@ -25,10 +25,41 @@ from pathlib import Path
 from urllib.parse import parse_qs
 from db import (
     is_admin, get_all_users, get_all_episodes, get_recent_versions,
-    get_episodes_with_user_versions,
+    get_episodes_with_user_versions, get_all_locations, get_all_seasons,
+    get_wants_more_suggestions,
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
-    set_season_speakers,
+    get_user_info, get_episode_info, get_user_episode_count,
+    set_season_speakers, set_location_season,
 )
+from mail import send_email
+
+
+_WELCOME_BODY = """\
+Hi {name}!
+Thank you so much for volunteering to help out with the Taskmaster transcripts. I have created a web app online for you to use.
+
+**Intro**
+My webpage loads the YouTube episode alongside the transcript. I'm already running a process over the transcript to estimate who is speaking. However the process is wrong as often as it is right. That's where you come in.
+
+**Where to begin**
+The process I used to estimate speakers doesn't know speaker names, so you'll just see SPEAKER_00, SPEAKER_01, etc.
+The first time you change a SPEAKER_ to a real name the tool will ask you if you'd like to swap all other instances of that speaker as well. Be warned sometimes the tool gets the speaker wrong (especially during the intro theme), so check that a given speaker seems correct before switching all of them. In practice I found it's best to start with the prize task. Then each of the 7 speakers gets a turn at speaking, which will give you a better idea of who is who.
+There is also the "Other" speaker which is for anything that can't be attributed to one of the 7 speakers: (e.g.: applause, noises, guest speaker)
+
+**Caveats**
+My process that annotated the speakers seems to have trouble with people speaking quickly back and forth, so quick banter or the live studio task will require more fixes from you.
+Also any transition from one speaker to another will sometimes be off by one caption.
+The timecode is MOSTLY in sync with the video, but there are some spots where the timecode information might be off a bit.
+
+**YOUR TASK**
+This is your personal link to the tool. Please don't share this with anyone else. I'm creating a different link for each person otherwise this would be impossible to track. Further instructions on how to use the app can be found on the link. Please let me know if you have any issues, comments, improvements for the tool.
+
+**YOUR LINK:** {link}
+
+Your time starts now!
+-Peter
+"Data Time"
+"""
 
 
 def valid_id(uid):
@@ -41,6 +72,9 @@ def action_load_data():
         "episodes":                    get_all_episodes(),
         "recent_versions":             get_recent_versions(),
         "episodes_with_user_versions": get_episodes_with_user_versions(),
+        "locations":                   get_all_locations(),
+        "seasons":                     get_all_seasons(),
+        "wants_more_suggestions":      get_wants_more_suggestions(),
     }, ensure_ascii=False)
 
 
@@ -85,6 +119,7 @@ def action_scan_transcripts():
                 "season_number":  season_number,
                 "episode_number": episode_number,
             })
+    results.sort(key=lambda r: (r["show_name"] or "", r["season_number"] or 0, r["episode_number"] or 0))
     return "200 OK", json.dumps({"results": results})
 
 
@@ -132,12 +167,44 @@ def action_populate_transcript(data):
 
 
 def action_add_episode_to_user(data):
-    email      = str(data.get("email",      "") or "").strip()
-    youtube_id = str(data.get("youtube_id", "") or "").strip()
-    if not email or not youtube_id:
-        return "400 Bad Request", json.dumps({"error": "email and youtube_id are required"})
+    user_uid    = str(data.get("user_uid",    "") or "").strip()
+    episode_uid = str(data.get("episode_uid", "") or "").strip()
+    if not user_uid or not episode_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
     try:
-        add_episode_to_user(email, youtube_id)
+        add_episode_to_user(user_uid, episode_uid)
+        user          = get_user_info(user_uid)
+        episode       = get_episode_info(episode_uid)
+        episode_count = get_user_episode_count(user_uid)
+        if user and episode:
+            label    = f"{episode['show_name']} S{episode['season_number']}E{episode['episode_number']}"
+            base_url = f"https://itsdatatime.com/transcript-webapp/viewer.html?user={user_uid}"
+            if episode_count == 1:
+                viewer_url = base_url
+                send_email(
+                    to      = user["email"],
+                    subject = "Taskmaster Transcription Volunteering",
+                    body    = _WELCOME_BODY.format(name=user["name"].upper(), link=viewer_url),
+                )
+            else:
+                viewer_url = f"{base_url}&episode={episode_uid}"
+                send_email(
+                    to      = user["email"],
+                    subject = f"Your new episode is ready: {label}",
+                    body    = f"Hi {user['name']}!\n\nYour new episode is ready: **{label}**\n\n{viewer_url}",
+                )
+        return "200 OK", json.dumps({"ok": True})
+    except Exception as e:
+        return "500 Internal Server Error", json.dumps({"error": str(e)})
+
+
+def action_set_location_season(data):
+    location   = str(data.get("location",   "") or "").strip()
+    season_uid = str(data.get("season_uid", "") or "").strip()
+    if not location or not season_uid:
+        return "400 Bad Request", json.dumps({"error": "location and season_uid are required"})
+    try:
+        set_location_season(location, season_uid)
         return "200 OK", json.dumps({"ok": True})
     except ValueError as e:
         return "404 Not Found", json.dumps({"error": str(e)})
@@ -168,6 +235,7 @@ POST_ACTIONS = {
     "populate_transcript":  action_populate_transcript,
     "add_episode_to_user":  action_add_episode_to_user,
     "set_season_speakers":  action_set_season_speakers,
+    "set_location_season":  action_set_location_season,
 }
 
 status = "200 OK"

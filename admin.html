@@ -415,7 +415,7 @@
             <th class="sortable" onclick="sortUsers('name')">Name <span class="sort-indicator" id="sort-name"></span></th>
             <th class="sortable" onclick="sortUsers('email')">Email <span class="sort-indicator" id="sort-email"></span></th>
             <th class="sortable" onclick="sortUsers('location')">Location <span class="sort-indicator" id="sort-location"></span></th>
-            <th class="sortable" onclick="sortUsers('wants_more')">Wants More <span class="sort-indicator" id="sort-wants_more"></span></th>
+            <th class="sortable" onclick="sortUsers('wants_more')">Ready for Next Episode<span class="sort-indicator" id="sort-wants_more"></span></th>
             <th>Link</th>
             <th></th>
           </tr>
@@ -486,6 +486,17 @@ Alex Horne</textarea>
     <div class="result" id="speakers-result"></div>
   </div>
 
+  <!-- Locations -->
+  <div class="section">
+    <h2>Locations</h2>
+    <div class="users-table-wrap">
+      <table class="users-table" id="locations-table">
+        <thead><tr><th>Location</th><th>Season</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Populate transcript -->
   <div class="section">
     <h2>Populate Transcript</h2>
@@ -524,10 +535,11 @@ Alex Horne</textarea>
     }
 
     let allUsers              = [];
-    let selectedUserEmail     = null;
+    let selectedUserUid       = null;
     let allEpisodesWithUsers  = [];
     let userSortKey           = null;
     let userSortAsc           = true;
+    let wantsMoreSuggestions  = {};
 
     async function loadData() {
       const res  = await fetch(`./admin.py?user=${userUid}`);
@@ -538,11 +550,54 @@ Alex Horne</textarea>
       }
       allUsers = data.users;
       allEpisodesWithUsers = data.episodes_with_user_versions;
+      wantsMoreSuggestions = data.wants_more_suggestions || {};
       renderRecentVersions(data.recent_versions);
       renderEpisodesWithUsers(data.episodes_with_user_versions);
       populateSeasonSelect(data.episodes_with_user_versions);
       renderUsers(data.users);
       renderEpisodeSelect(data.episodes);
+      renderLocations(data.locations || [], data.seasons || []);
+    }
+
+    function renderLocations(locations, seasons) {
+      const tbody = document.querySelector('#locations-table tbody');
+      tbody.innerHTML = '';
+      if (!locations.length) {
+        tbody.innerHTML = '<tr><td colspan="2" style="color:#666;font-style:italic">No locations defined</td></tr>';
+        return;
+      }
+      const seasonOptions = seasons.map(s =>
+        `<option value="${escHtml(s.uid)}">${escHtml(s.show_name)} — Season ${s.season_number}</option>`
+      ).join('');
+      locations.forEach(({ location, show_name, season_number }) => {
+        const currentUid = (seasons.find(s => s.show_name === show_name && s.season_number === season_number) || {}).uid || '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escHtml(location)}</td>
+          <td>
+            <select class="loc-season-select" data-location="${escHtml(location)}">${seasonOptions}</select>
+            <span class="loc-save-status" style="margin-left:6px;font-size:0.8rem;color:#666"></span>
+          </td>`;
+        tr.querySelector('select').value = currentUid;
+        tbody.appendChild(tr);
+      });
+      tbody.addEventListener('change', async e => {
+        const sel = e.target.closest('.loc-season-select');
+        if (!sel) return;
+        const status = sel.parentElement.querySelector('.loc-save-status');
+        status.textContent = 'Saving…';
+        status.style.color = '#888';
+        const res  = await post({ action: 'set_location_season', location: sel.dataset.location, season_uid: sel.value });
+        const data = await res.json();
+        if (res.ok) {
+          status.textContent = 'Saved';
+          status.style.color = '#4caf50';
+          setTimeout(() => { status.textContent = ''; }, 2000);
+        } else {
+          status.textContent = data.error || 'Error';
+          status.style.color = '#f44336';
+        }
+      });
     }
 
     function populateSeasonSelect(episodes) {
@@ -691,6 +746,33 @@ Alex Horne</textarea>
       renderUsers(allUsers);
     }
 
+    function wantsMoreCell(userUid) {
+      const s = wantsMoreSuggestions[userUid];
+      if (!s) return '<span style="color:#666">None available</span>';
+      const label = escHtml(`${s.show_name} S${s.season_number}E${s.episode_number}`);
+      return `<button class="btn-small assign-suggested-btn" data-user-uid="${escHtml(userUid)}" data-episode-uid="${escHtml(s.episode_uid)}">${label}</button><span class="assign-status" style="margin-left:6px;font-size:0.8rem"></span>`;
+    }
+
+    document.getElementById('users-tbody').addEventListener('click', async e => {
+      const btn = e.target.closest('.assign-suggested-btn');
+      if (!btn) return;
+      const status = btn.nextElementSibling;
+      btn.disabled = true;
+      status.style.color = '#888';
+      status.textContent = 'Processing…';
+      const res  = await post({ action: 'add_episode_to_user', user_uid: btn.dataset.userUid, episode_uid: btn.dataset.episodeUid });
+      const data = await res.json();
+      if (res.ok) {
+        status.style.color = '#4caf50';
+        status.textContent = 'Assigned!';
+        await loadData();
+      } else {
+        btn.disabled = false;
+        status.style.color = '#f44336';
+        status.textContent = data.error || 'Failed to assign episode';
+      }
+    });
+
     function renderUsers(users) {
       const tbody     = document.getElementById('users-tbody');
       const testUsers = users.filter(u => u.is_test_account);
@@ -715,9 +797,9 @@ Alex Horne</textarea>
           <td>${escHtml(u.name || '—')}${adminBadge}${testBadge}</td>
           <td>${escHtml(u.email)}</td>
           <td>${escHtml(u.location || '—')}</td>
-          <td style="text-align:center">${u.wants_more ? '✓' : ''}</td>
+          <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
           <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
-          <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.email))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
+          <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
       }).join('') || '<tr><td colspan="6">No users found</td></tr>';
 
@@ -747,14 +829,14 @@ Alex Horne</textarea>
           lastSeason = seasonKey;
         }
         const opt = document.createElement('option');
-        opt.value = ep.youtube_id;
+        opt.value = ep.uid;
         opt.textContent = `S${ep.season} E${ep.episode}`;
         group.appendChild(opt);
       });
     }
 
-    function showAddEpisodePanel(email, name) {
-      selectedUserEmail = email;
+    function showAddEpisodePanel(userUid, name) {
+      selectedUserUid = userUid;
       document.getElementById('ae-user-name').textContent = name;
       document.getElementById('ae-episode').value = '';
       clearResult('add-episode-result');
@@ -763,7 +845,7 @@ Alex Horne</textarea>
 
     function hideAddEpisodePanel() {
       document.getElementById('add-episode-panel').style.display = 'none';
-      selectedUserEmail = null;
+      selectedUserUid = null;
     }
 
     async function deleteTestAccounts() {
@@ -881,12 +963,12 @@ Alex Horne</textarea>
     }
 
     async function addEpisodeToUser() {
-      const email      = selectedUserEmail;
-      const youtube_id = document.getElementById('ae-episode').value;
-      if (!email || !youtube_id) { showResult('add-episode-result', false, 'Select an episode.'); return; }
+      const user_uid    = selectedUserUid;
+      const episode_uid = document.getElementById('ae-episode').value;
+      if (!user_uid || !episode_uid) { showResult('add-episode-result', false, 'Select an episode.'); return; }
       clearResult('add-episode-result');
 
-      const res  = await post({ action: 'add_episode_to_user', email, youtube_id });
+      const res  = await post({ action: 'add_episode_to_user', user_uid, episode_uid });
       const data = await res.json();
       if (res.ok) {
         showResult('add-episode-result', true, 'Episode added to user.');
