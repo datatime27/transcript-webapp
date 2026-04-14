@@ -11,7 +11,7 @@ Deploy to a CGI-capable web server. `transcripts.py`, `merge.py`, `admin.py`, `r
 Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`, `signup.html`) — all HTML, CSS, and JS inline. Python CGI backends (`transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`). MySQL database via `db.py`. Email via `mail.py`.
 
 **viewer.html flow:**
-1. On load, fetches `./transcripts.py?user={uid}` → `{name, episodes: [{version_id, title, version, episode_uid}]}`. Displays username on load screen. Populates load-screen dropdown and in-app episode switcher.
+1. On load, fetches `./transcripts.py?user={uid}` → `{name, episodes: [{version_id, title, version, episode_uid, is_complete}]}`. Displays username on load screen. Populates load-screen dropdown and in-app episode switcher.
 2. If `?episode={episode_uid}` is in the URL, skips the load screen and auto-loads that episode.
 3. User selects an episode and clicks Open. Fetches `./transcripts.py?version={version_id}` for the full JSON.
 4. `loadTranscript()` is called: runs `applyBracketedNameOverrides()`, renders the transcript, initialises the YouTube player, and seeks to the last `modified=true` caption without auto-playing.
@@ -31,7 +31,7 @@ Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`
 
 ## Key behaviours
 
-- **Episode switcher:** dropdown in the app header; warns on unsaved changes when switching.
+- **Episode switcher:** dropdown in the app header; warns on unsaved changes when switching. On every episode load, `loadTranscript` resets the **I'm Done!** button — shows green "Done ✓" (disabled) if `is_complete`, otherwise restores default state.
 - **Speaker labels:** first name only, unless two speakers share a first name (then full name).
 - **`applyBracketedNameOverrides()`:** on load, sets speaker from `[FirstName...]` prefix in caption text. Skips captions that are `modified=true` or already have a real speaker name.
 - **Keyboard shortcuts:** Space = play/pause, ArrowUp/Down = previous/next caption (seeks preserving current play/pause state). Speaker assignment keys and the "previous different speaker" key are all user-configurable via the settings popup (persisted in `localStorage` as `speakerKeys` JSON array and `prevSpeakerKey`). Defaults: `1`–`9` for speakers, `` ` `` for previous different speaker. A slow-motion toggle key is also configurable (`slowMoKey`, default `/`).
@@ -123,7 +123,7 @@ Boolean-like flags use `TINYINT(1) DEFAULT NULL` (not `BOOLEAN`, not `DEFAULT FA
 - `set_location_season(location, season_uid)` — updates the season for a location row.
 - `get_wants_more_suggestions()` — for each user with `wants_more=1`, returns the best unassigned episode from their season (via locations table, US fallback). Excludes episodes assigned to admin/test users from the count. Returns `{user_uid: {episode_uid, show_name, season_number, episode_number} | None}`. Uses 4 queries total regardless of user count.
 - `set_wants_more(user_uid, value)` — sets `wants_more=1` or `NULL`.
-- `get_episodes_for_user(user_uid)` — returns `[{version_id, title, version, episode_uid}]`, user's own latest version (COALESCE fallback to original), ordered by show/season/episode. Uses alias `s` for `shows` (`show` is a MySQL reserved word).
+- `get_episodes_for_user(user_uid)` — returns `[{version_id, title, version, episode_uid, is_complete}]`, user's own latest version (COALESCE fallback to original), ordered by show/season/episode. Uses alias `s` for `shows` (`show` is a MySQL reserved word).
 - `get_version(version_uid)` — returns `(filepath, speakers)` for a version; speakers injected into JSON by `transcripts.py`.
 - `get_reapply_data(version_uid)` — returns 7-tuple: `(original_filepath, version_filepath, episode_title, user_name, youtube_id, user_uid, episode_uid)`.
 - `get_mergeable_episodes()` — returns `[{episode_uid, title}]` for episodes with ≥2 distinct user versions.

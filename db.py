@@ -408,7 +408,7 @@ def get_episodes_for_user(user_uid):
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT e.title, v.uid, v.version_number, e.uid
+            """SELECT e.title, v.uid, v.version_number, e.uid, ue.is_complete
                FROM episodes e
                JOIN user_episodes ue ON ue.episode_uid = e.uid
                JOIN versions v ON v.uid = COALESCE(
@@ -422,7 +422,7 @@ def get_episodes_for_user(user_uid):
             (user_uid,),
         )
         return [
-            {"version_id": row[1], "title": row[0], "version": row[2], "episode_uid": row[3]}
+            {"version_id": row[1], "title": row[0], "version": row[2], "episode_uid": row[3], "is_complete": bool(row[4])}
             for row in cur.fetchall()
         ]
     finally:

@@ -1414,13 +1414,14 @@
         return;
       }
       const episodeSelectEl = document.getElementById('episode-select');
-      list.forEach(({ version_id, title, version }) => {
+      list.forEach(({ version_id, title, version, is_complete }) => {
         const label = decodeHtml(title || version_id);
 
         const opt = document.createElement('option');
         opt.value = version_id;
         opt.textContent = label;
         if (version != null) opt.dataset.version = version;
+        if (is_complete) opt.dataset.isComplete = '1';
         selectEl.appendChild(opt);
 
         const appOpt = opt.cloneNode(true);
@@ -1432,7 +1433,7 @@
         : list.length === 1 ? list[0] : null;
 
       if (autoEntry && preselectedEpisodeUid) {
-        try { await fetchAndLoad(autoEntry.version_id, autoEntry.version ?? null); } catch (err) { showLoadError(`Could not load transcript: ${err.message}`); }
+        try { await fetchAndLoad(autoEntry.version_id, autoEntry.version ?? null, autoEntry.is_complete ?? false); } catch (err) { showLoadError(`Could not load transcript: ${err.message}`); }
         return;
       }
 
@@ -1448,11 +1449,11 @@
     }
   }
 
-  async function fetchAndLoad(versionUid, version) {
+  async function fetchAndLoad(versionUid, version, isComplete = false) {
     const res = await fetch(`./transcripts.py?version=${versionUid}`);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
-    loadTranscript(data, version, versionUid, data.speakers || []);
+    loadTranscript(data, version, versionUid, data.speakers || [], isComplete);
   }
 
   document.getElementById('load-btn').addEventListener('click', async () => {
@@ -1461,8 +1462,9 @@
     if (!id) return;
     const selectedOpt = selectEl.options[selectEl.selectedIndex];
     const version = selectedOpt.dataset.version ? parseInt(selectedOpt.dataset.version) : null;
+    const isComplete = selectedOpt.dataset.isComplete === '1';
     try {
-      await fetchAndLoad(id, version);
+      await fetchAndLoad(id, version, isComplete);
     } catch (err) {
       showLoadError(`Could not load transcript: ${err.message}`);
     }
@@ -1502,8 +1504,9 @@
 
     const selectedOpt = selectEl.options[selectEl.selectedIndex];
     const version = selectedOpt.dataset.version ? parseInt(selectedOpt.dataset.version) : null;
+    const isComplete = selectedOpt.dataset.isComplete === '1';
     try {
-      await fetchAndLoad(versionUid, version);
+      await fetchAndLoad(versionUid, version, isComplete);
     } catch (err) {
       selectEl.value = currentVersionUid;
       alert(`Could not load episode: ${err.message}`);
@@ -1579,6 +1582,11 @@
       doneBtn.style.color = '#4caf50';
       doneBtn.disabled = true;
       saveBtn.disabled = false;
+      // Mark both option elements so switching away and back reflects done state
+      for (const sel of ['transcript-select', 'episode-select']) {
+        const opt = document.querySelector(`#${sel} option[value="${currentVersionUid}"]`);
+        if (opt) opt.dataset.isComplete = '1';
+      }
     } catch (err) {
       doneBtn.textContent = "I'm Done!";
       doneBtn.disabled = false;
@@ -1814,7 +1822,7 @@
     document.getElementById('version-badge').textContent = version != null ? `v${version}` : '';
   }
 
-  function loadTranscript(data, version = null, versionUid = null, speakers = []) {
+  function loadTranscript(data, version = null, versionUid = null, speakers = [], isComplete = false) {
     updateSpeakers(speakers);
     transcriptData = data;
     captions = data.captions;
@@ -1823,6 +1831,20 @@
     activeIndex = -1;
     unsavedChanges = false;
     currentVersionUid = versionUid;
+
+    // Reset done button state for the newly loaded episode
+    const doneBtn = document.getElementById('done-btn');
+    if (isComplete) {
+      doneBtn.textContent = 'Done ✓';
+      doneBtn.style.borderColor = '#4caf50';
+      doneBtn.style.color = '#4caf50';
+      doneBtn.disabled = true;
+    } else {
+      doneBtn.textContent = "I'm Done!";
+      doneBtn.style.borderColor = '';
+      doneBtn.style.color = '';
+      doneBtn.disabled = false;
+    }
 
     // Sync episode dropdown and version badge
     if (versionUid) document.getElementById('episode-select').value = versionUid;
