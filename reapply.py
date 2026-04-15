@@ -3,7 +3,7 @@
 CGI script — reapply annotations tool (admin only).
 
   GET /reapply.py?user={admin_uid}&version={version_uid}
-    → runs apply_annotations(original_v1, version, tolerance=5)
+    → runs apply_annotations(user_version, new_base)
     → returns { episode_title, user_name, youtube_id,
                 total, matched, altered_cc,
                 user_captions:   [{text, start, speaker}, ...]
@@ -15,7 +15,6 @@ CGI script — reapply annotations tool (admin only).
 import copy
 import json
 import os
-import re
 import sys
 import traceback
 
@@ -39,8 +38,6 @@ try:
     params         = parse_qs(os.environ.get("QUERY_STRING", ""))
     user_uid       = params.get("user",       [""])[0]
     version_uid    = params.get("version",    [""])[0]
-    use_altered_cc = params.get("altered_cc", ["1"])[0] != "0"
-
     if not valid_id(user_uid) or not is_admin(user_uid):
         status = "403 Forbidden"
         body   = json.dumps({"error": "Admin access required"})
@@ -61,29 +58,22 @@ try:
         else:
             base = os.path.dirname(os.path.abspath(__file__))
             with open(os.path.join(base, original_filepath), encoding='utf-8') as f:
-                source = json.load(f)
+                new_base = json.load(f)
             with open(os.path.join(base, version_filepath), encoding='utf-8') as f:
-                annotations = json.load(f)
+                user_version = json.load(f)
 
-            result          = apply_annotations(copy.deepcopy(source), annotations, tolerance=5, use_altered_cc=use_altered_cc)
+            result          = apply_annotations(copy.deepcopy(user_version), new_base)
             result_captions = result['captions']
-            user_captions   = annotations['captions']
+            user_captions   = user_version['captions']
 
-            # Compute which user caption each result caption matched (same logic as apply_annotations)
-            annotation_lookup_idx = {}
-            for idx, c in enumerate(user_captions):
-                key = re.sub(r'\s+', ' ', c['text'])
-                annotation_lookup_idx.setdefault(key, []).append((to_float(c['start']), idx))
-
-            row_matches = []
-            for c in source['captions']:
-                candidates = annotation_lookup_idx.get(c['text'], [])
-                c_start    = to_float(c['start'])
-                match_idx  = next(
-                    (idx for start, idx in candidates if abs(start - c_start) <= 5),
-                    None
-                )
-                row_matches.append(match_idx)
+            # Map each result caption back to its user caption index (by start time).
+            # ALTERED_CC captions get null — they render as result-only rows, while
+            # the displaced user caption at the same start becomes a user-only row.
+            user_start_to_idx = {to_float(c['start']): i for i, c in enumerate(user_captions)}
+            row_matches = [
+                None if c.get('speaker') == 'ALTERED_CC' else user_start_to_idx.get(to_float(c['start']))
+                for c in result_captions
+            ]
 
             altered_cc          = sum(1 for c in result_captions if c.get('speaker') == 'ALTERED_CC')
             matched             = len(result_captions) - altered_cc

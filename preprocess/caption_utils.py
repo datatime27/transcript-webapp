@@ -69,21 +69,28 @@ def split_multi_speaker_captions(captions):
     return result
 
 
-# Split on whitespace that follows sentence-ending punctuation.
-# (?<=[.?!]) — positive lookbehind: must follow a sentence-ending punctuation mark
-#              including the final '.' in an ellipsis like '...'
-# \s+        — one or more whitespace characters (including newlines)
+# Two-branch split pattern:
+#
+# Branch 1 — no-space boundary: (?<=\w[.?!])(?=[A-Z][a-z])
+#   Fires when punctuation is preceded by a word character (\w) and immediately
+#   followed by an uppercase+lowercase pair. The \w lookbehind prevents leading
+#   dots (e.g. "..Babatunde") from triggering a split.
+#
+# Branch 2 — whitespace boundary: (?<=[.?!])\s+
+#   Original behaviour: split on whitespace after any sentence-ending punctuation,
+#   including the final '.' of an ellipsis ("Hello... World").
 #
 # Example splits:
-#   "Hello. World"     -> ["Hello.", "World"]
-#   "Hello... World"   -> ["Hello...", "World"]
-#   "Hello... world"   -> ["Hello...", "world"]
-#   "Dr. Smith"        -> ["Dr.", "Smith"]
+#   "Hello. World"       -> ["Hello.", "World"]
+#   "Hello... World"     -> ["Hello...", "World"]
+#   "Hello... world"     -> ["Hello...", "world"]
+#   "Dr. Smith"          -> ["Dr.", "Smith"]
+#   "God.Yeah, really."  -> ["God.", "Yeah, really."]
 #
 # Example non-splits:
-#   "I'm 2.5 km away"  -> ["I'm 2.5 km away"]
-#   "U.S.A."           -> ["U.S.A."]   # no whitespace after punctuation
-SENTENCE_SPLIT_RE = re.compile(r'(?<=[.?!])\s+')
+#   "I'm 2.5 km away"    -> ["I'm 2.5 km away"]     # digit after '.', not [A-Z][a-z]
+#   "..Babatunde Aleshe" -> ["..Babatunde Aleshe"]   # leading '.' not preceded by \w
+SENTENCE_SPLIT_RE = re.compile(r'(?:(?<=\w[.?!])(?=[A-Z][a-z])|(?<=[.?!])\s+)')
 
 def split_into_sentences(captions):
     """Split captions containing multiple sentences into one caption per sentence.

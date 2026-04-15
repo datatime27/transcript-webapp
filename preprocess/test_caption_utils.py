@@ -355,6 +355,38 @@ class TestNormalizeSoundeffectPipeline(unittest.TestCase):
         result = normalize_soundeffect_captions(split_into_sentences(caps))
         self.assertEqual([c['text'] for c in result], ['OK.', '[LAUGHTER]'])
 
+    def test_no_space_between_sentences(self):
+        # 'God.Yeah' has no whitespace — must still split at the sentence boundary
+        caps = [{'text': "HE SIGHS\nOh, God.Yeah, it's in there.", 'start': 0.0, 'duration': 2.0}]
+        result = normalize_soundeffect_captions(split_into_sentences(split_multi_speaker_captions(strip_music_markers(caps))))
+        self.assertEqual([c['text'] for c in result], ['[HE SIGHS] Oh, God.', "Yeah, it's in there."])
+
+    def test_decimal_not_split(self):
+        caps = [{'text': 'I ran 2.5 kilometres.', 'start': 0.0, 'duration': 2.0}]
+        result = normalize_soundeffect_captions(split_into_sentences(caps))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['text'], 'I ran 2.5 kilometres.')
+
+    def test_acronym_splits_at_sentence_boundary(self):
+        caps = [{'text': 'I was born in the U.S.A. Then I moved.', 'start': 0.0, 'duration': 2.0}]
+        result = split_into_sentences(caps)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['text'], 'I was born in the U.S.A.')
+        self.assertEqual(result[1]['text'], 'Then I moved.')
+
+    def test_leading_dots_not_split(self):
+        # Leading dots before a name must not cause a spurious split
+        caps = [{'text': '..Babatunde Aleshe...\nCHEERING AND APPLAUSE', 'start': 0.0, 'duration': 3.0}]
+        result = normalize_soundeffect_captions(split_into_sentences(split_multi_speaker_captions(strip_music_markers(caps))))
+        self.assertEqual([c['text'] for c in result], ['..Babatunde Aleshe...', '[CHEERING AND APPLAUSE]'])
+
+    def test_acronym_splits_at_sentence_boundary_no_space(self):
+        caps = [{'text': 'I was born in the U.S.A.Then I moved.', 'start': 0.0, 'duration': 2.0}]
+        result = split_into_sentences(caps)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['text'], 'I was born in the U.S.A.')
+        self.assertEqual(result[1]['text'], 'Then I moved.')
+
 
 class TestNormalizeSoundeffectCaptions(unittest.TestCase):
 

@@ -98,7 +98,7 @@ def action_scan_transcripts():
             try:
                 fdata = json.loads(f.read_text(encoding="utf-8"))
                 title = html_module.unescape(fdata.get("title") or "")
-                m = re.search(r"Taskmaster\s+Australia.*?Season\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
+                m = re.search(r"Taskmaster\s+Australia.*?(?:Season|Series)\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
                 if m:
                     show_name, season_number, episode_number = "Taskmaster AU", int(m.group(1)), int(m.group(2))
                 else:
