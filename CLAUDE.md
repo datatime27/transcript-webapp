@@ -81,7 +81,7 @@ Gmail SMTP helper. Credentials read from `[mail]` section of `db.ini` (`host`, `
 Admin-only tool at `admin.html?user={uid}`. Sections:
 - **Recent Versions** — latest version per user per episode in the last 7 days; timestamps stored as Eastern Time in MySQL, sent as ISO with `America/New_York` offset via `zoneinfo`, formatted in the browser via `new Date(...).toLocaleString()`.
 - **Episodes** — all episodes with user version tags, grouped by season with `<div class="season-separator">` headings. Started tags link to `reapply.html`; unstarted tags link to `viewer.html?user=...&episode=...`. Admin users and test users are hidden from unstarted tags (only appear once they've saved a version).
-- **Users** — scrollable table; per-row "Add Episode" button opens an inline panel; user name links to `viewer.html?user={uid}`. Use `escHtml(JSON.stringify(...))` for inline `onclick` attributes to safely handle special characters. The **Ready for Next** column shows a suggested episode button for users with `wants_more=1`; clicking it calls `add_episode_to_user` and emails the user.
+- **Users** — scrollable table with a **Copy TSV** button in the heading that copies all user data to the clipboard (Name, Email, Location, Episodes Assigned, Episodes Started, Wants More, UID). Per-row "Add Episode" button opens an inline panel; user name links to `viewer.html?user={uid}`. Use `escHtml(JSON.stringify(...))` for inline `onclick` attributes to safely handle special characters. Columns: Name, Email, Location, **Episodes Assigned** (count of `user_episodes` rows), **Episodes Started** (count of distinct episodes with a saved version), Ready for Next Episode, Link. The **Ready for Next** column shows a suggested episode button for users with `wants_more=1`; clicking it calls `add_episode_to_user` and emails the user.
 - **Locations** — table of location→season mappings; each row has a season select that auto-saves on change.
 - **Season Speakers** — set `speaker_associations` for a show+season via `set_season_speakers` DB function.
 - **Create User / Populate Transcript** — form panels for admin operations.
@@ -115,7 +115,7 @@ Boolean-like flags use `TINYINT(1) DEFAULT NULL` (not `BOOLEAN`, not `DEFAULT FA
 - `populate_transcript()` — registers a JSON file into the DB (get-or-creates show/season/episode, inserts version); stores path relative to `db.py` location.
 - `create_user(email, name, is_test_account=None, location=None, is_anonymous=None)` — creates a user with `wants_more=1` and returns uid. `name` is required (NOT NULL). `is_anonymous` stored separately from name.
 - `delete_test_accounts()` — deletes versions, user_episodes, then users where `is_test_account=1`; returns count.
-- `get_all_users()` — returns full user list including `wants_more` and `active` flags.
+- `get_all_users()` — returns full user list including `wants_more`, `active`, `episodes_assigned` (COUNT DISTINCT from `user_episodes`), and `episodes_started` (COUNT DISTINCT episode_uid from `versions`) via a single query with two LEFT JOINs.
 - `get_all_episodes()` — returns full episode list including `uid` field.
 - `get_recent_versions()` — latest version per user per episode from the last 7 days; timestamps use `zoneinfo` `America/New_York`.
 - `get_episodes_with_user_versions()` — all episodes with `users` list per episode; each user entry includes `is_admin` and `is_test_account`; sorted unstarted-first within each episode.

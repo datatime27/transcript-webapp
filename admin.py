@@ -184,7 +184,7 @@ def action_add_episode_to_user(data):
                 send_email(
                     to      = user["email"],
                     subject = "Taskmaster Transcription Volunteering",
-                    body    = _WELCOME_BODY.format(name=user["name"].upper(), link=viewer_url),
+                    body    = _WELCOME_BODY.format(name=user["name"], link=viewer_url),
                 )
             else:
                 viewer_url = f"{base_url}&episode={episode_uid}"

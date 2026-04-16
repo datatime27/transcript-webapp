@@ -273,18 +273,30 @@ def get_all_users():
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT uid, email, name, is_admin, is_test_account, location, wants_more, active FROM users ORDER BY name",
+            """
+            SELECT u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location,
+                   u.wants_more, u.active,
+                   COUNT(DISTINCT ue.episode_uid) AS episodes_assigned,
+                   COUNT(DISTINCT v.episode_uid)  AS episodes_started
+            FROM users u
+            LEFT JOIN user_episodes ue ON ue.user_uid = u.uid
+            LEFT JOIN versions v ON v.user_uid = u.uid
+            GROUP BY u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location, u.wants_more, u.active
+            ORDER BY u.name
+            """,
         )
         return [
             {
-                "uid":             row[0],
-                "email":           row[1],
-                "name":            row[2],
-                "is_admin":        bool(row[3]),
-                "is_test_account": bool(row[4]),
-                "location":        row[5],
-                "wants_more":      bool(row[6]),
-                "active":          bool(row[7]),
+                "uid":               row[0],
+                "email":             row[1],
+                "name":              row[2],
+                "is_admin":          bool(row[3]),
+                "is_test_account":   bool(row[4]),
+                "location":          row[5],
+                "wants_more":        bool(row[6]),
+                "active":            bool(row[7]),
+                "episodes_assigned": row[8],
+                "episodes_started":  row[9],
             }
             for row in cur.fetchall()
         ]

@@ -406,7 +406,7 @@
 
   <!-- Users -->
   <div class="section">
-    <h2>Users</h2>
+    <h2>Users <button id="copy-users-tsv" class="btn-small" style="font-size:0.75rem;vertical-align:middle">Copy TSV</button></h2>
     <input type="text" id="user-filter" placeholder="Filter users…" autocomplete="off">
     <div class="users-table-wrap">
       <table class="users-table">
@@ -415,13 +415,15 @@
             <th class="sortable" onclick="sortUsers('name')">Name <span class="sort-indicator" id="sort-name"></span></th>
             <th class="sortable" onclick="sortUsers('email')">Email <span class="sort-indicator" id="sort-email"></span></th>
             <th class="sortable" onclick="sortUsers('location')">Location <span class="sort-indicator" id="sort-location"></span></th>
+            <th class="sortable" onclick="sortUsers('episodes_assigned')">Episodes Assigned <span class="sort-indicator" id="sort-episodes_assigned"></span></th>
+            <th class="sortable" onclick="sortUsers('episodes_started')">Episodes Started <span class="sort-indicator" id="sort-episodes_started"></span></th>
             <th class="sortable" onclick="sortUsers('wants_more')">Ready for Next Episode<span class="sort-indicator" id="sort-wants_more"></span></th>
             <th>Link</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-tbody">
-          <tr><td colspan="6">Loading…</td></tr>
+          <tr><td colspan="8">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -731,14 +733,14 @@ Alex Horne</textarea>
       ).join('') || '<tr><td colspan="4">No activity in the last 24 hours</td></tr>';
     }
 
-    const SORT_COLS = ['name', 'email', 'location', 'wants_more'];
+    const SORT_COLS = ['name', 'email', 'location', 'episodes_assigned', 'episodes_started', 'wants_more'];
 
     function sortUsers(key) {
       if (userSortKey === key) {
         userSortAsc = !userSortAsc;
       } else {
         userSortKey = key;
-        userSortAsc = key !== 'wants_more'; // bools default descending (true first); strings ascending
+        userSortAsc = key !== 'wants_more' && key !== 'episodes_assigned' && key !== 'episodes_started'; // bools/numbers default descending; strings ascending
       }
       SORT_COLS.forEach(col => {
         const el = document.getElementById(`sort-${col}`);
@@ -784,6 +786,10 @@ Alex Horne</textarea>
             const diff = (valB ? 1 : 0) - (valA ? 1 : 0);
             return userSortAsc ? -diff : diff;
           }
+          if (userSortKey === 'episodes_assigned' || userSortKey === 'episodes_started') {
+            const diff = (valA ?? 0) - (valB ?? 0);
+            return userSortAsc ? diff : -diff;
+          }
           valA = (valA || '').toLowerCase();
           valB = (valB || '').toLowerCase();
           const diff = valA < valB ? -1 : valA > valB ? 1 : 0;
@@ -798,16 +804,36 @@ Alex Horne</textarea>
           <td>${escHtml(u.name || '—')}${adminBadge}${testBadge}</td>
           <td>${escHtml(u.email)}</td>
           <td>${escHtml(u.location || '—')}</td>
+          <td>${u.episodes_assigned ?? '—'}</td>
+          <td>${u.episodes_started ?? '—'}</td>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
           <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
           <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
-      }).join('') || '<tr><td colspan="6">No users found</td></tr>';
+      }).join('') || '<tr><td colspan="8">No users found</td></tr>';
 
       const btn = document.getElementById('delete-test-btn');
       document.getElementById('test-count').textContent = testUsers.length;
       btn.style.display = testUsers.length ? 'inline-block' : 'none';
     }
+
+    document.getElementById('copy-users-tsv').addEventListener('click', async function() {
+      const headers = ['Name', 'Email', 'Location', 'Episodes Assigned', 'Episodes Started', 'Wants More', 'UID'];
+      const rows = allUsers.map(u => [
+        u.name || '',
+        u.email,
+        u.location || '',
+        u.episodes_assigned ?? 0,
+        u.episodes_started  ?? 0,
+        u.wants_more ? '1' : '0',
+        u.uid,
+      ].map(String));
+      const tsv = [headers, ...rows].map(r => r.join('\t')).join('\n');
+      await navigator.clipboard.writeText(tsv);
+      const orig = this.textContent;
+      this.textContent = 'Copied!';
+      setTimeout(() => { this.textContent = orig; }, 1500);
+    });
 
     document.getElementById('user-filter').addEventListener('input', function() {
       const q = this.value.toLowerCase();
