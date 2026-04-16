@@ -71,26 +71,32 @@ def split_multi_speaker_captions(captions):
 
 # Two-branch split pattern:
 #
-# Branch 1 — no-space boundary: (?<=\w[.?!])(?=[A-Z][a-z])
+# Two-branch split pattern:
+#
+# Branch 1 — no-space boundary: (?<=\w[.?!])(?=[A-Z][a-zA-Z'])
 #   Fires when punctuation is preceded by a word character (\w) and immediately
-#   followed by an uppercase+lowercase pair. The \w lookbehind prevents leading
-#   dots (e.g. "..Babatunde") from triggering a split.
+#   followed by a capital letter then any letter or apostrophe. The \w lookbehind
+#   prevents leading dots (e.g. "..Babatunde") from triggering a split. The
+#   two-character lookahead avoids splitting on lone initials like "A." and
+#   handles mixed-case ("Yeah"), all-caps ("OK", "YES"), and contractions ("I'm").
 #
 # Branch 2 — whitespace boundary: (?<=[.?!])\s+
 #   Original behaviour: split on whitespace after any sentence-ending punctuation,
 #   including the final '.' of an ellipsis ("Hello... World").
 #
 # Example splits:
-#   "Hello. World"       -> ["Hello.", "World"]
-#   "Hello... World"     -> ["Hello...", "World"]
-#   "Hello... world"     -> ["Hello...", "world"]
-#   "Dr. Smith"          -> ["Dr.", "Smith"]
-#   "God.Yeah, really."  -> ["God.", "Yeah, really."]
+#   "Hello. World"             -> ["Hello.", "World"]
+#   "Hello... World"           -> ["Hello...", "World"]
+#   "Hello... world"           -> ["Hello...", "world"]
+#   "Dr. Smith"                -> ["Dr.", "Smith"]
+#   "God.Yeah, really."        -> ["God.", "Yeah, really."]
+#   "I'm a comedian.OK."       -> ["I'm a comedian.", "OK."]
+#   "You all right?I'm good."  -> ["You all right?", "I'm good."]
 #
 # Example non-splits:
-#   "I'm 2.5 km away"    -> ["I'm 2.5 km away"]     # digit after '.', not [A-Z][a-z]
+#   "I'm 2.5 km away"    -> ["I'm 2.5 km away"]     # digit after '.', not a letter
 #   "..Babatunde Aleshe" -> ["..Babatunde Aleshe"]   # leading '.' not preceded by \w
-SENTENCE_SPLIT_RE = re.compile(r'(?:(?<=\w[.?!])(?=[A-Z][a-z])|(?<=[.?!])\s+)')
+SENTENCE_SPLIT_RE = re.compile(r"(?:(?<=\w[.?!])(?=[A-Z][a-zA-Z'])|(?<=[.?!])\s+)")
 
 def split_into_sentences(captions):
     """Split captions containing multiple sentences into one caption per sentence.

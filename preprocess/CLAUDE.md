@@ -79,6 +79,19 @@ Each caption in `data['captions']` gains two new fields:
 }
 ```
 
+## caption_utils.py
+
+Preprocessing utilities used by the pipeline. `preprocess_captions(captions)` runs the full pipeline:
+
+1. `strip_music_markers` — removes `#` characters from caption text.
+2. `split_multi_speaker_captions` — splits captions containing `\n-` (two speakers on one caption) into separate captions with proportional durations.
+3. `split_into_sentences` — splits captions containing multiple sentences into one caption per sentence, with durations proportional to text length. Uses `SENTENCE_SPLIT_RE` (two branches):
+   - **No-space boundary** `(?<=\w[.?!])(?=[A-Z][a-zA-Z'])`: fires when `.`, `?`, or `!` is preceded by a word character and immediately followed by a capital letter then any letter or apostrophe. Handles mixed-case (`Yeah`), all-caps (`OK`), and contractions (`I'm`). The two-character lookahead prevents splitting on lone initials (`A.`).
+   - **Whitespace boundary** `(?<=[.?!])\s+`: splits on whitespace after sentence-ending punctuation.
+4. `normalize_soundeffect_captions` — brackets all-caps sound-effect prefixes (e.g. `TINNY VOICE: Hello` → `[TINNY VOICE]: Hello`) and wraps standalone all-caps captions in `[...]`. Leaves `OK`/`OKAY` and already-bracketed captions unchanged.
+
+Unit tests: `test_caption_utils.py` (run with `python -m pytest test_caption_utils.py`).
+
 ## Configuration (in script)
 
 | Variable | Value | Description |

@@ -387,6 +387,22 @@ class TestNormalizeSoundeffectPipeline(unittest.TestCase):
         self.assertEqual(result[0]['text'], 'I was born in the U.S.A.')
         self.assertEqual(result[1]['text'], 'Then I moved.')
 
+    def test_all_caps_word_no_space_split(self):
+        # "I'm a comedian.OK." — no whitespace between sentences, second sentence is all-caps
+        caps = [{'text': "I'm a comedian.OK.", 'start': 0.0, 'duration': 2.0}]
+        result = split_into_sentences(caps)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['text'], "I'm a comedian.")
+        self.assertEqual(result[1]['text'], 'OK.')
+
+    def test_contraction_after_question_mark_no_space(self):
+        # "You all right?I'm good." — no whitespace, next sentence starts with contraction
+        caps = [{'text': "You all right?I'm good.", 'start': 0.0, 'duration': 2.0}]
+        result = split_into_sentences(caps)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['text'], 'You all right?')
+        self.assertEqual(result[1]['text'], "I'm good.")
+
 
 class TestNormalizeSoundeffectCaptions(unittest.TestCase):
 
