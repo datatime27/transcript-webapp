@@ -298,7 +298,8 @@ def get_all_episodes():
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT e.uid, e.youtube_id, e.title, s.name, season.number, e.number
+            """SELECT e.uid, e.youtube_id, e.title, s.name, season.number, e.number,
+                      season.is_complete
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -306,12 +307,13 @@ def get_all_episodes():
         )
         return [
             {
-                "uid":        row[0],
-                "youtube_id": row[1],
-                "title":      row[2],
-                "show":       row[3],
-                "season":     row[4],
-                "episode":    row[5],
+                "uid":             row[0],
+                "youtube_id":      row[1],
+                "title":           row[2],
+                "show":            row[3],
+                "season":          row[4],
+                "episode":         row[5],
+                "season_complete": bool(row[6]),
             }
             for row in cur.fetchall()
         ]

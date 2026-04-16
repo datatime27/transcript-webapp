@@ -821,7 +821,7 @@ Alex Horne</textarea>
       sel.innerHTML = '<option value="">Select an episode…</option>';
       let lastSeason = null;
       let group = null;
-      episodes.forEach(ep => {
+      episodes.filter(ep => !ep.season_complete).forEach(ep => {
         const seasonKey = `${ep.show}|${ep.season}`;
         if (seasonKey !== lastSeason) {
           group = document.createElement('optgroup');
