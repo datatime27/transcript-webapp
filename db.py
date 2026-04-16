@@ -136,7 +136,7 @@ def get_episodes_with_user_versions():
                       SUBSTRING_INDEX(GROUP_CONCAT(v.uid ORDER BY v.version_number DESC), ',', 1),
                       s.name, season.number, e.number, u.is_admin, u.is_test_account,
                       (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid),
-                      season.is_complete, ue.is_complete
+                      season.is_complete, ue.is_complete, u.is_anonymous
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -169,6 +169,7 @@ def get_episodes_with_user_versions():
                     "is_admin":         bool(row[10]),
                     "is_test_account":  bool(row[11]),
                     "is_complete":      bool(row[14]),
+                    "is_anonymous":     bool(row[15]),
                 })
         for ep in episodes.values():
             ep["users"].sort(key=lambda u: (u["version_uid"] is not None, u["user_name"]))

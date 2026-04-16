@@ -631,8 +631,9 @@ Alex Horne</textarea>
         visibleUsers.forEach(u => {
           if (!userMap[u.user_uid]) {
             userMap[u.user_uid] = {
-              user_name: u.user_name,
-              user_uid:  u.user_uid,
+              user_name:    u.user_name,
+              user_uid:     u.user_uid,
+              is_anonymous: u.is_anonymous,
               saved: 0,
               total: 0,
             };
@@ -646,7 +647,7 @@ Alex Horne</textarea>
         b.saved - a.saved || (a.user_name || '').localeCompare(b.user_name || '')
       );
 
-      out.value = users.map(u => `${u.user_name || u.user_uid}: ${u.saved}`).join('\n');
+      out.value = users.map(u => `${u.user_name || u.user_uid}${u.is_anonymous ? ' (anon)' : ''}: ${u.saved}`).join('\n');
       out.rows  = Math.max(3, users.length);
       out.style.display  = 'block';
     }
