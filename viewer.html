@@ -691,6 +691,7 @@
         <li>This webpage loads the YouTube episode alongside the transcript. I have produced the transcript using a process that estimates who is speaking. However, in practice, the estimations are only correct some of the time.</li>
       </ul>
     </div>
+
     <div class="help-section">
       <h3>Getting started</h3>
       <ul>
@@ -698,7 +699,7 @@
         <li>The first time you change a <strong>SPEAKER_</strong> to a real name the tool will ask you if you'd like to apply this to all other instances of that speaker as well.</li>
         <li>Be warned sometimes the tool gets the speaker wrong (especially during the intro theme), so check that a given speaker seems correct before applying to all of them.</li>
         <li>In practice I found it's best to start with the prize task. Then each of the 7 speakers gets a turn at speaking, which will give you a better idea of who is who.</li>
-        <li>There is also the <strong>Other</strong> speaker which is for anything that can't be attributed to one of the 7 speakers: (e.g.: applause, noises, guest speaker)</li>
+        <li>There is also the <strong>Other</strong> speaker which is for anything that can't be attributed to one of the 7 speakers (e.g. applause, noises, guest speaker).</li>
       </ul>
     </div>
 
@@ -706,22 +707,39 @@
       <h3>Playback</h3>
       <ul>
         <li><span class="help-key">Space</span> Play / pause</li>
-        <li><span class="help-key">↑</span> <span class="help-key">↓</span> Previous / next caption</li>
+        <li><span class="help-key">↑</span> <span class="help-key">↓</span> Previous / next caption (preserves play/pause state)</li>
         <li><strong>Click caption text or timecode</strong> — seek and play</li>
         <li><strong>Click speaker button</strong> — seek and pause, open speaker picker</li>
         <li>The active caption is highlighted in <span style="color:#ff7777;">red</span>.</li>
+        <li>The panel divider between the video and transcript is draggable (20–80% range).</li>
       </ul>
     </div>
 
     <div class="help-section">
       <h3>Assigning speakers</h3>
       <ul>
-        <li>For each line you select the speaker from the drop down menu.</li>
-        <li>For each group of lines from the same speaker there is also a group header that you can select to change the speaker for all lines.</li>
-        <li><span class="help-key">1</span>–<span class="help-key">9</span> Assign the nth speaker to the active caption</li>
-        <li><span class="help-key">`</span> The backtick key (the key to the left of 1 on the keyboard) assigns the previous different speaker to the active caption.</li>
-        <li>So if you have a scene where two speakers are talking back and forth, the system will sometimes assign all of the lines to just one speaker. As you play through the scene, you can press the backtick key in order to set the active line to the other speaker.</li>
+        <li>Click a speaker button on any caption (or group header) to open the speaker picker.</li>
+        <li>For each group of lines from the same speaker there is also a group header — changing it reassigns all lines in that group at once.</li>
+        <li><span class="help-key">1</span>–<span class="help-key">9</span> Assign the nth speaker to the active caption (keys are configurable in Settings).</li>
+        <li><span class="help-key">`</span> Assign the previous different speaker to the active caption — useful for back-and-forth exchanges where the tool has assigned all lines to one speaker (key is configurable in Settings).</li>
         <li>Manually edited captions are highlighted in <span style="color:#77ff77;">green</span> so you can track your progress.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Editing caption text</h3>
+      <ul>
+        <li><strong>Double-click any caption text</strong> to enter inline edit mode. The video pauses automatically.</li>
+        <li><span class="help-key">Enter</span> or clicking away commits the edit.</li>
+        <li><span class="help-key">Escape</span> reverts the caption to its original text.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Slow motion</h3>
+      <ul>
+        <li>Press <span class="help-key">/</span> (configurable in Settings) to toggle slow-motion playback. A speed badge appears in the header while active.</li>
+        <li>The slow-motion rate is adjustable in Settings (default 0.5×).</li>
       </ul>
     </div>
 
@@ -729,17 +747,23 @@
       <h3>Saving</h3>
       <ul>
         <li>Click <strong>Save</strong> (top-right) to save your progress. Each save creates a new version.</li>
-        <li>Currently, there is no undo — double-check before using the Apply to all feature.</li>
+        <li>There is no undo — double-check before using the Apply to all feature.</li>
         <li>You can switch episodes from the dropdown in the header; you'll be warned if there are unsaved changes.</li>
+        <li>Click <strong>I'm Done!</strong> when you've finished the episode. You can also indicate you're ready for a new episode at that point.</li>
       </ul>
     </div>
 
     <div class="help-section">
       <h3>Settings <span style="font-size:0.9em;">⚙</span></h3>
       <ul>
-        <li>Click <strong>⚙</strong> (top-right) to open settings.</li>
-        <li><strong>Scroll delay</strong> — how long to wait before the transcript auto-scrolls to the active caption.</li>
-        <li><strong>Speaker colors</strong> — customize the color for each speaker slot. Changes take effect immediately and are saved for your next visit.</li>
+        <li>Click <strong>⚙</strong> (top-right) to open settings. Use <strong>Reset all</strong> to restore every setting to its default.</li>
+        <li><strong>Scroll delay</strong> — how long to wait before the transcript auto-scrolls to the active caption (default 200 ms).</li>
+        <li><strong>Poll interval</strong> — how often the transcript highlight is synced with the video position (default 150 ms).</li>
+        <li><strong>Scroll duration (near)</strong> — animation duration when scrolling a short distance, below the cutoff (default 800 ms).</li>
+        <li><strong>Scroll duration (far)</strong> — animation duration when scrolling a long distance, above the cutoff (default 300 ms).</li>
+        <li><strong>Scroll distance cutoff</strong> — pixel threshold that determines whether near or far duration is used (default 300 px).</li>
+        <li><strong>Slow motion</strong> — configure the toggle key and playback rate (default key <span class="help-key">/</span>, default rate 0.5×).</li>
+        <li><strong>Speaker colors &amp; keys</strong> — customize the color and keyboard shortcut for each of the 9 speaker slots. Changes take effect immediately and are saved for your next visit.</li>
       </ul>
     </div>
 
