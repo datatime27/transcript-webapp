@@ -277,11 +277,12 @@ def get_all_users():
             SELECT u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location,
                    u.wants_more, u.active,
                    COUNT(DISTINCT ue.episode_uid) AS episodes_assigned,
-                   COUNT(DISTINCT v.episode_uid)  AS episodes_started
+                   COUNT(DISTINCT v.episode_uid)  AS episodes_started,
+                   u.created_at
             FROM users u
             LEFT JOIN user_episodes ue ON ue.user_uid = u.uid
             LEFT JOIN versions v ON v.user_uid = u.uid
-            GROUP BY u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location, u.wants_more, u.active
+            GROUP BY u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location, u.wants_more, u.active, u.created_at
             ORDER BY u.name
             """,
         )
@@ -297,6 +298,7 @@ def get_all_users():
                 "active":            bool(row[7]),
                 "episodes_assigned": row[8],
                 "episodes_started":  row[9],
+                "created_at":        row[10].replace(tzinfo=_EASTERN).isoformat() if row[10] else None,
             }
             for row in cur.fetchall()
         ]

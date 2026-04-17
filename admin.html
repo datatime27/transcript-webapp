@@ -418,12 +418,13 @@
             <th class="sortable" onclick="sortUsers('episodes_assigned')">Episodes Assigned <span class="sort-indicator" id="sort-episodes_assigned"></span></th>
             <th class="sortable" onclick="sortUsers('episodes_started')">Episodes Started <span class="sort-indicator" id="sort-episodes_started"></span></th>
             <th class="sortable" onclick="sortUsers('wants_more')">Ready for Next Episode<span class="sort-indicator" id="sort-wants_more"></span></th>
+            <th class="sortable" onclick="sortUsers('created_at')">Joined <span class="sort-indicator" id="sort-created_at"></span></th>
             <th>Link</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-tbody">
-          <tr><td colspan="8">Loading…</td></tr>
+          <tr><td colspan="9">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -807,10 +808,11 @@ Alex Horne</textarea>
           <td>${u.episodes_assigned ?? '—'}</td>
           <td>${u.episodes_started ?? '—'}</td>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
+          <td class="text-small">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
           <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
           <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
-      }).join('') || '<tr><td colspan="8">No users found</td></tr>';
+      }).join('') || '<tr><td colspan="9">No users found</td></tr>';
 
       const btn = document.getElementById('delete-test-btn');
       document.getElementById('test-count').textContent = testUsers.length;
@@ -818,7 +820,7 @@ Alex Horne</textarea>
     }
 
     document.getElementById('copy-users-tsv').addEventListener('click', async function() {
-      const headers = ['Name', 'Email', 'Location', 'Episodes Assigned', 'Episodes Started', 'Wants More', 'UID'];
+      const headers = ['Name', 'Email', 'Location', 'Episodes Assigned', 'Episodes Started', 'Wants More', 'Joined', 'UID'];
       const rows = allUsers.map(u => [
         u.name || '',
         u.email,
@@ -826,6 +828,7 @@ Alex Horne</textarea>
         u.episodes_assigned ?? 0,
         u.episodes_started  ?? 0,
         u.wants_more ? '1' : '0',
+        u.created_at ? new Date(u.created_at).toLocaleDateString() : '',
         u.uid,
       ].map(String));
       const tsv = [headers, ...rows].map(r => r.join('\t')).join('\n');
