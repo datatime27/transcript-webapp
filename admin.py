@@ -29,7 +29,7 @@ from db import (
     get_wants_more_suggestions,
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
     get_user_info, get_episode_info, get_user_episode_count,
-    set_season_speakers, set_location_season,
+    set_season_speakers, set_location_season, update_user_location,
 )
 from mail import send_email
 
@@ -229,13 +229,26 @@ def action_set_season_speakers(data):
         return "404 Not Found", json.dumps({"error": str(e)})
 
 
+def action_update_user_location(data):
+    user_uid = str(data.get("user_uid", "") or "").strip()
+    location = str(data.get("location", "") or "").strip() or None
+    if not user_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid is required"})
+    try:
+        update_user_location(user_uid, location)
+        return "200 OK", json.dumps({"ok": True})
+    except Exception as e:
+        return "500 Internal Server Error", json.dumps({"error": str(e)})
+
+
 POST_ACTIONS = {
-    "delete_test_accounts": action_delete_test_accounts,
-    "create_user":          action_create_user,
-    "populate_transcript":  action_populate_transcript,
-    "add_episode_to_user":  action_add_episode_to_user,
-    "set_season_speakers":  action_set_season_speakers,
-    "set_location_season":  action_set_location_season,
+    "delete_test_accounts":   action_delete_test_accounts,
+    "create_user":            action_create_user,
+    "populate_transcript":    action_populate_transcript,
+    "add_episode_to_user":    action_add_episode_to_user,
+    "set_season_speakers":    action_set_season_speakers,
+    "set_location_season":    action_set_location_season,
+    "update_user_location":   action_update_user_location,
 }
 
 status = "200 OK"

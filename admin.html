@@ -109,6 +109,9 @@
     .result.success { background: #0e2e0e; color: #4a8; border: 1px solid #2a5a2a; }
     .result.error   { background: #2e0e0e; color: #f88; border: 1px solid #5a2a2a; }
 
+    .loc-cell { cursor: text; }
+    .loc-cell:hover { background: #1a2a1a; }
+
     /* Users table */
     #user-filter {
       width: 100%;
@@ -406,7 +409,7 @@
 
   <!-- Users -->
   <div class="section">
-    <h2>Users <button id="copy-users-tsv" class="btn-small" style="font-size:0.75rem;vertical-align:middle">Copy TSV</button></h2>
+    <h2>Users <span id="user-count" style="font-size:0.8rem;color:#888;font-weight:normal;vertical-align:middle"></span> <button id="copy-users-tsv" class="btn-small" style="font-size:0.75rem;vertical-align:middle">Copy TSV</button></h2>
     <input type="text" id="user-filter" placeholder="Filter users…" autocomplete="off">
     <div class="users-table-wrap">
       <table class="users-table">
@@ -750,6 +753,40 @@ Alex Horne</textarea>
       renderUsers(allUsers);
     }
 
+    async function editLocationCell(td, userUid) {
+      if (td.querySelector('input')) return;
+      const current = td.textContent.trim() === '—' ? '' : td.textContent.trim();
+      td.textContent = '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = current;
+      input.style.cssText = 'width:100%;box-sizing:border-box;font-size:inherit;background:#1a2a1a;color:#ccc;border:1px solid #4a7a4a;border-radius:3px;padding:2px 4px';
+      td.appendChild(input);
+      input.focus();
+      input.select();
+
+      async function commit() {
+        const newVal = input.value.trim();
+        if (newVal === current) { td.textContent = current || '—'; return; }
+        const res  = await post({ action: 'update_user_location', user_uid: userUid, location: newVal });
+        const data = await res.json();
+        if (res.ok) {
+          const user = allUsers.find(u => u.uid === userUid);
+          if (user) user.location = newVal || null;
+          td.textContent = newVal || '—';
+        } else {
+          td.textContent = current || '—';
+          alert(data.error || 'Failed to update location');
+        }
+      }
+
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.removeEventListener('blur', commit); td.textContent = current || '—'; }
+      });
+    }
+
     function wantsMoreCell(userUid) {
       const s = wantsMoreSuggestions[userUid];
       if (!s) return '<span style="color:#666">None available</span>';
@@ -804,7 +841,7 @@ Alex Horne</textarea>
         return `<tr>
           <td>${escHtml(u.name || '—')}${adminBadge}${testBadge}</td>
           <td>${escHtml(u.email)}</td>
-          <td>${escHtml(u.location || '—')}</td>
+          <td class="loc-cell" title="Double-click to edit" ondblclick="editLocationCell(this, ${escHtml(JSON.stringify(u.uid))})">${escHtml(u.location || '—')}</td>
           <td>${u.episodes_assigned ?? '—'}</td>
           <td>${u.episodes_started ?? '—'}</td>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
@@ -813,6 +850,8 @@ Alex Horne</textarea>
           <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
       }).join('') || '<tr><td colspan="9">No users found</td></tr>';
+
+      document.getElementById('user-count').textContent = `(${allUsers.length})`;
 
       const btn = document.getElementById('delete-test-btn');
       document.getElementById('test-count').textContent = testUsers.length;

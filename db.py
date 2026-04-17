@@ -548,6 +548,22 @@ def insert_version(youtube_id, filepath, user_uid, is_merged=None):
         conn.close()
 
 
+def update_user_location(user_uid, location):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET location = %s WHERE uid = %s",
+            (location or None, user_uid),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def set_wants_more(user_uid, value):
     """Set the wants_more flag on a user."""
     conn = get_db_connection()
