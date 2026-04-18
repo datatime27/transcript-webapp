@@ -1278,6 +1278,10 @@
           e.stopPropagation();
         });
 
+        textSpan.addEventListener('click', e => {
+          if (textSpan.contentEditable === 'true') e.stopPropagation();
+        });
+
         line.appendChild(timeSpan);
         line.appendChild(captionSpeakerBtn);
         line.appendChild(textSpan);
