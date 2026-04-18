@@ -660,17 +660,23 @@ Alex Horne</textarea>
 
     function renderEpisodeRow(ep) {
       const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
-      const tagOrder = u => u.version_number == null ? 0 : u.is_complete ? 2 : 1;
       const users = visibleUsers.length
-        ? visibleUsers.slice().sort((a, b) => tagOrder(a) - tagOrder(b)).map(u => {
+        ? visibleUsers.slice().sort((a, b) => {
+            const ta = a.version_created_at ? new Date(a.version_created_at).getTime() : 0;
+            const tb = b.version_created_at ? new Date(b.version_created_at).getTime() : 0;
+            return ta - tb;
+          }).map(u => {
             const cls     = u.version_number == null ? 'episode-user-tag unstarted'
                           : u.is_complete             ? 'episode-user-tag completed'
                           :                             'episode-user-tag';
             const version = u.version_number != null ? ` v${u.version_number}` : '';
+            const dateStr = u.version_created_at
+              ? ' · ' + new Date(u.version_created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+              : '';
             const href    = u.version_uid
               ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
               : `viewer.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
-            return `<a class="${cls}" href="${href}" target="_blank">${escHtml(u.user_name || u.user_uid)}${version}</a>`;
+            return `<a class="${cls}" href="${href}" target="_blank">${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       return `<div class="episode-row${ep.has_merged ? ' merged' : ''}">
