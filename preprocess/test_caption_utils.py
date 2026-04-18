@@ -380,6 +380,13 @@ class TestNormalizeSoundeffectPipeline(unittest.TestCase):
         result = normalize_soundeffect_captions(split_into_sentences(split_multi_speaker_captions(strip_music_markers(caps))))
         self.assertEqual([c['text'] for c in result], ['..Babatunde Aleshe...', '[CHEERING AND APPLAUSE]'])
 
+    def test_doubled_ellipsis_splits_on_closing_quote(self):
+        # '"..Doubled..." "..Doubled..."' — closing quote after ellipsis should split
+        caps = [{'text': '"..Doubled..." "..Doubled..."', 'start': 0.0, 'duration': 2.0}]
+        result = split_into_sentences(caps)
+        self.assertEqual(len(result), 2)
+        self.assertEqual([c['text'] for c in result], ['"..Doubled..."', '"..Doubled..."'])
+
     def test_acronym_splits_at_sentence_boundary_no_space(self):
         caps = [{'text': 'I was born in the U.S.A.Then I moved.', 'start': 0.0, 'duration': 2.0}]
         result = split_into_sentences(caps)

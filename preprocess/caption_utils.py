@@ -81,22 +81,27 @@ def split_multi_speaker_captions(captions):
 #   handles mixed-case ("Yeah"), all-caps ("OK", "YES"), and contractions ("I'm").
 #
 # Branch 2 — whitespace boundary: (?<=[.?!])\s+
-#   Original behaviour: split on whitespace after any sentence-ending punctuation,
+#   Split on whitespace after any sentence-ending punctuation,
 #   including the final '.' of an ellipsis ("Hello... World").
 #
+# Branch 3 — closing-quote boundary: (?<=[.?!]["'])\s+
+#   Split on whitespace after sentence-ending punctuation followed by a closing
+#   quote, e.g. '"..Doubled..." "..Doubled..."' → ['"..Doubled..."', '"..Doubled..."'].
+#
 # Example splits:
-#   "Hello. World"             -> ["Hello.", "World"]
-#   "Hello... World"           -> ["Hello...", "World"]
-#   "Hello... world"           -> ["Hello...", "world"]
-#   "Dr. Smith"                -> ["Dr.", "Smith"]
-#   "God.Yeah, really."        -> ["God.", "Yeah, really."]
-#   "I'm a comedian.OK."       -> ["I'm a comedian.", "OK."]
-#   "You all right?I'm good."  -> ["You all right?", "I'm good."]
+#   "Hello. World"                       -> ["Hello.", "World"]
+#   "Hello... World"                     -> ["Hello...", "World"]
+#   "Hello... world"                     -> ["Hello...", "world"]
+#   "Dr. Smith"                          -> ["Dr.", "Smith"]
+#   "God.Yeah, really."                  -> ["God.", "Yeah, really."]
+#   "I'm a comedian.OK."                 -> ["I'm a comedian.", "OK."]
+#   "You all right?I'm good."            -> ["You all right?", "I'm good."]
+#   '"..Doubled..." "..Doubled..."'      -> ['"..Doubled..."', '"..Doubled..."']
 #
 # Example non-splits:
 #   "I'm 2.5 km away"    -> ["I'm 2.5 km away"]     # digit after '.', not a letter
 #   "..Babatunde Aleshe" -> ["..Babatunde Aleshe"]   # leading '.' not preceded by \w
-SENTENCE_SPLIT_RE = re.compile(r"(?:(?<=\w[.?!])(?=[A-Z][a-zA-Z'])|(?<=[.?!])\s+)")
+SENTENCE_SPLIT_RE = re.compile(r"""(?:(?<=\w[.?!])(?=[A-Z][a-zA-Z'])|(?<=[.?!])\s+|(?<=[.?!]["'])\s+)""")
 
 def split_into_sentences(captions):
     """Split captions containing multiple sentences into one caption per sentence.
