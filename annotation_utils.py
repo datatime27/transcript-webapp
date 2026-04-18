@@ -13,10 +13,10 @@ def to_float(v):
     except (ValueError, TypeError):
         return 0.0
 
-def apply_annotations(user_version, new_base):
+def apply_annotations(user_version, new_base, compare_text=False):
     """Merge captions from new_base into user_version:
-    - Same start + duration → keep user_version caption unchanged
-    - Same start, different duration → replace with new_base caption, set speaker='ALTERED_CC'
+    - Same start + duration (+ text if compare_text) → keep user_version caption unchanged
+    - Same start, different duration or text → replace with new_base caption, set speaker='ALTERED_CC'
     - Start not in user_version → insert new_base caption in start-time order, set speaker='ALTERED_CC'
 
     Returns user_version modified in place."""
@@ -31,7 +31,9 @@ def apply_annotations(user_version, new_base):
         if nb_start in user_by_start:
             idx = user_by_start[nb_start]
             uv_cap = user_version['captions'][idx]
-            if uv_cap.get('duration') != nb_cap.get('duration'):
+            duration_changed = uv_cap.get('duration') != nb_cap.get('duration')
+            text_changed = compare_text and uv_cap.get('text') != nb_cap.get('text')
+            if duration_changed or text_changed:
                 new_cap = dict(nb_cap)
                 new_cap['speaker'] = 'ALTERED_CC'
                 user_version['captions'][idx] = new_cap

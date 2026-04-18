@@ -66,9 +66,31 @@ Public sign-up page at `signup.html`. Fields: Email (required), Name (required),
 
 `signup.py` POST: accepts `{email, name, location, is_anonymous}`, calls `create_user()`, then sends an admin notification email via `mail.py`. Returns `{ok: true}` on success or `{error}` on failure. No admin check — publicly accessible.
 
+## reapply.html / reapply.py
+
+Admin-only tool at `reapply.html?user={admin_uid}&version={version_uid}`. Shows a side-by-side diff of a user's annotated version vs. the result of running `apply_annotations()` against the current base transcript. Left panel: YouTube player. Right panel: diff table.
+
+**reapply.py GET**: `?user={admin_uid}&version={version_uid}&altered_cc=0|1&compare_text=0|1` — loads original and user version files, runs `apply_annotations(compare_text=...)`, aligns result captions to user captions by start time, returns `{episode_title, user_name, youtube_id, user_uid, episode_uid, speakers, total, matched, altered_cc, removed, user_captions, result_captions, row_matches}`. `speakers` is the season speaker list (used to populate dropdowns). `row_matches` is a list parallel to `result_captions`: each entry is the index into `user_captions` for matched rows, or `null` for ALTERED_CC rows. `altered_cc=0` uses nearest-annotation speaker instead of ALTERED_CC for unmatched captions.
+
+**Diff table columns**: Time | User text | User speaker | Result text | Result speaker | × (remove).
+
+**Row types**: `row-match` (greyed, opacity 0.3, show-matched checkbox defaults on), `row-user-only` (yellow-tinted), `row-result-only` (red-tinted, ALTERED_CC).
+
+**Result speaker column**: matched rows show the result speaker as plain text; ALTERED_CC rows show a dropdown populated with season speakers + Other + MULTIPLE (defaulting to ALTERED_CC). Changing a dropdown updates the live ALTERED_CC count in the summary.
+
+**Remove button** (×): every row has one. For rows with a result caption (match + result-only), the result caption index is added to `deletedResultIndices`; for user-only rows it just hides the row. On save, deleted indices are filtered from `result_captions`.
+
+**Summary**: shows matched / ALTERED_CC / removed / total counts. ALTERED_CC count updates live as dropdowns change or rows are removed.
+
+**Header controls**: ↑↓ Prev/Next ALTERED_CC (navigates `alteredIndices`), Show matched checkbox, Use ALTERED_CC checkbox (triggers reload), Compare text checkbox (triggers reload — passes `compare_text=1` to reapply.py, flags text-changed captions as ALTERED_CC in addition to duration-changed ones).
+
+**Save**: collects dropdown speaker selections into `result_captions`, filters deleted indices, POSTs to `transcripts.py` as a new version for the original user.
+
+**Episodes section in admin.html**: **Check ALTERED_CC** button + **Compare text** checkbox. Makes one GET to `admin.py?action=check_altered_cc&compare_text=0|1`, which batch-processes all started versions in active seasons. Started user tags have `data-version-uid` attributes; tags with ALTERED_CC get an orange border (`.has-altered-cc`) and an orange count badge (`.altered-count`). Summary shown on completion.
+
 ## annotation_utils.py
 
-`apply_annotations(user_version, new_base)` merges a new base transcript into a user-annotated version. For each caption in `new_base`: exact start+duration match → leave unchanged; start match but different duration → replace with new_base caption and set `speaker='ALTERED_CC'`; start not present → insert in start-time order with `speaker='ALTERED_CC'`. Used by `reapply.py`.
+`apply_annotations(user_version, new_base, compare_text=False)` merges a new base transcript into a user-annotated version. For each caption in `new_base`: exact start+duration match (and text match if `compare_text=True`) → leave unchanged; start match but different duration or text → replace with new_base caption and set `speaker='ALTERED_CC'`; start not present → insert in start-time order with `speaker='ALTERED_CC'`. Used by `reapply.py` and `admin.py` (`action_check_altered_cc`).
 
 **`SPEAKER_RENAMES` dict** (top of file): maps old speaker name strings to corrected ones. Applied globally to all captions at the end of `apply_annotations`. Add entries here to fix misspelled or variant speaker names across all processed transcripts.
 
@@ -86,7 +108,7 @@ Admin-only tool at `admin.html?user={uid}`. Sections:
 - **Season Speakers** — set `speaker_associations` for a show+season via `set_season_speakers` DB function.
 - **Create User / Populate Transcript** — form panels for admin operations.
 
-`admin.py` GET actions: default (no `action` param) returns `{users, episodes, recent_versions, episodes_with_user_versions, locations, seasons, wants_more_suggestions}`; `action=scan_transcripts` scans the `transcripts/` directory for `.json` files not yet in the DB (excludes user-version files matching `_[a-z0-9]{8}_\d{14}.json`), reads each file's title (HTML-unescaped), parses show/season/episode via regex, and returns `[{filepath, filename, title, show_name, season_number, episode_number}]` sorted by show/season/episode.
+`admin.py` GET actions: default (no `action` param) returns `{users, episodes, recent_versions, episodes_with_user_versions, locations, seasons, wants_more_suggestions}`; `action=scan_transcripts` scans the `transcripts/` directory for `.json` files not yet in the DB (excludes user-version files matching `_[a-z0-9]{8}_\d{14}.json`), reads each file's title (HTML-unescaped), parses show/season/episode via regex, and returns `[{filepath, filename, title, show_name, season_number, episode_number}]` sorted by show/season/episode; `action=check_altered_cc&compare_text=0|1` runs `apply_annotations` on every started user version in active (non-complete) seasons and returns `{version_uid: altered_cc_count}` for versions with at least one ALTERED_CC — caches original transcript files per episode to avoid redundant reads.
 
 `admin.py` POST actions: `delete_test_accounts`, `create_user`, `populate_transcript`, `add_episode_to_user`, `set_season_speakers`, `set_location_season`, `update_user_location`. Each action is a module-level function returning `(status, body)`; dispatched via `POST_ACTIONS` dict.
 

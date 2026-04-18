@@ -14,6 +14,7 @@ CGI script — admin tool (admin only).
     set_season_speakers  — show_name, season_number, speakers
 """
 
+import copy
 import html as html_module
 import json
 import os
@@ -30,7 +31,9 @@ from db import (
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
     get_user_info, get_episode_info, get_user_episode_count,
     set_season_speakers, set_location_season, update_user_location,
+    get_reapply_data,
 )
+from annotation_utils import apply_annotations
 from mail import send_email
 
 
@@ -76,6 +79,35 @@ def action_load_data():
         "seasons":                     get_all_seasons(),
         "wants_more_suggestions":      get_wants_more_suggestions(),
     }, ensure_ascii=False)
+
+
+def action_check_altered_cc(compare_text=False):
+    episodes = get_episodes_with_user_versions()
+    base = os.path.dirname(os.path.abspath(__file__))
+    original_cache = {}
+    results = {}
+
+    for ep in episodes:
+        if ep.get("season_complete"):
+            continue
+        for u in ep.get("users", []):
+            version_uid = u.get("version_uid")
+            if not version_uid:
+                continue
+            original_filepath, version_filepath, *_ = get_reapply_data(version_uid)
+            if not original_filepath or not version_filepath:
+                continue
+            if original_filepath not in original_cache:
+                with open(os.path.join(base, original_filepath), encoding="utf-8") as f:
+                    original_cache[original_filepath] = json.load(f)
+            with open(os.path.join(base, version_filepath), encoding="utf-8") as f:
+                user_version = json.load(f)
+            result = apply_annotations(copy.deepcopy(user_version), original_cache[original_filepath], compare_text=compare_text)
+            altered_cc = sum(1 for c in result["captions"] if c.get("speaker") == "ALTERED_CC")
+            if altered_cc > 0:
+                results[version_uid] = altered_cc
+
+    return "200 OK", json.dumps(results)
 
 
 def action_scan_transcripts():
@@ -267,6 +299,9 @@ try:
         action = params.get("action", [""])[0]
         if action == "scan_transcripts":
             status, body = action_scan_transcripts()
+        elif action == "check_altered_cc":
+            compare_text = params.get("compare_text", ["0"])[0] == "1"
+            status, body = action_check_altered_cc(compare_text=compare_text)
         else:
             status, body = action_load_data()
 

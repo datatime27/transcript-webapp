@@ -34,6 +34,12 @@ class TestStripMusicMarkers(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['text'], "[HIGH-PITCHED]: I'll give you a clue!")
 
+    def test_music_markers_stripped_mixed_case(self):
+        caps = [{'text': '# Da-da, dum-dum-dum. #', 'start': 0.0, 'duration': 2.0}]
+        result = normalize_soundeffect_captions(split_into_sentences(split_multi_speaker_captions(strip_music_markers(caps))))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['text'], 'Da-da, dum-dum-dum.')
+
 
 class TestSplitMultiSpeakerCaptions(unittest.TestCase):
 

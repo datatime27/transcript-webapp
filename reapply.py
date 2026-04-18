@@ -23,7 +23,7 @@ body   = ""
 
 try:
     from urllib.parse import parse_qs
-    from db import is_admin, get_reapply_data
+    from db import is_admin, get_reapply_data, get_speakers_for_episode
     from annotation_utils import apply_annotations
 
     def valid_id(uid):
@@ -36,8 +36,9 @@ try:
             return 0.0
 
     params         = parse_qs(os.environ.get("QUERY_STRING", ""))
-    user_uid       = params.get("user",       [""])[0]
-    version_uid    = params.get("version",    [""])[0]
+    user_uid       = params.get("user",         [""])[0]
+    version_uid    = params.get("version",      [""])[0]
+    compare_text   = params.get("compare_text", ["0"])[0] == "1"
     if not valid_id(user_uid) or not is_admin(user_uid):
         status = "403 Forbidden"
         body   = json.dumps({"error": "Admin access required"})
@@ -62,7 +63,7 @@ try:
             with open(os.path.join(base, version_filepath), encoding='utf-8') as f:
                 user_version = json.load(f)
 
-            result          = apply_annotations(copy.deepcopy(user_version), new_base)
+            result          = apply_annotations(copy.deepcopy(user_version), new_base, compare_text=compare_text)
             result_captions = result['captions']
             user_captions   = user_version['captions']
 
@@ -80,12 +81,15 @@ try:
             matched_user_idxs   = set(idx for idx in row_matches if idx is not None)
             removed             = len(user_captions) - len(matched_user_idxs)
 
+            speakers = get_speakers_for_episode(episode_uid)
+
             body = json.dumps({
                 "episode_title":   episode_title,
                 "user_name":       user_name,
                 "youtube_id":      youtube_id,
                 "user_uid":        user_uid,
                 "episode_uid":     episode_uid,
+                "speakers":        speakers,
                 "total":           len(result_captions),
                 "matched":         matched,
                 "altered_cc":      altered_cc,

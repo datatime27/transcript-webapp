@@ -340,6 +340,19 @@
     }
     a.episode-user-tag.unstarted:hover { background: #6a2020; }
 
+    .episode-user-tag.has-altered-cc { border-color: #cc6600 !important; }
+    .altered-count {
+      display: inline-block;
+      margin-left: 5px;
+      background: #ff0000;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0px 4px;
+      border-radius: 3px;
+      vertical-align: middle;
+    }
+
     .episode-no-users {
       font-size: 0.78rem;
       font-style: italic;
@@ -390,7 +403,7 @@
 
   <!-- Episodes -->
   <div class="section">
-    <h2>Episodes</h2>
+    <h2>Episodes <button id="check-altered-btn" class="btn-small" style="vertical-align:middle;margin-left:8px" onclick="checkAlteredCC(this)">Check ALTERED_CC</button> <label style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle;margin-left:6px;cursor:pointer"><input type="checkbox" id="check-compare-text" style="vertical-align:middle"> Compare text</label> <span id="check-altered-status" style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle"></span></h2>
     <div id="episodes-list">
       <p>Loading…</p>
     </div>
@@ -676,7 +689,8 @@ Alex Horne</textarea>
             const href    = u.version_uid
               ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
               : `viewer.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
-            return `<a class="${cls}" href="${href}" target="_blank">${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
+            const versionAttr = u.version_uid ? ` data-version-uid="${escHtml(u.version_uid)}"` : '';
+            return `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       return `<div class="episode-row${ep.has_merged ? ' merged' : ''}">
@@ -1075,6 +1089,47 @@ Alex Horne</textarea>
       } else {
         showResult('speakers-result', false, data.error);
       }
+    }
+
+    async function checkAlteredCC(btn) {
+      const status = document.getElementById('check-altered-status');
+      btn.disabled = true;
+      status.textContent = 'Checking…';
+
+      // Clear any previous results
+      document.querySelectorAll('a[data-version-uid]').forEach(a => {
+        a.classList.remove('has-altered-cc');
+        const badge = a.querySelector('.altered-count');
+        if (badge) badge.remove();
+      });
+
+      try {
+        const compareText = document.getElementById('check-compare-text').checked ? '1' : '0';
+        const res  = await fetch(`./admin.py?user=${encodeURIComponent(userUid)}&action=check_altered_cc&compare_text=${compareText}`);
+        const data = await res.json();
+        if (!res.ok) { status.textContent = data.error || 'Error'; btn.disabled = false; return; }
+
+        let withAltered = 0;
+        for (const [versionUid, count] of Object.entries(data)) {
+          withAltered++;
+          const a = document.querySelector(`a[data-version-uid="${CSS.escape(versionUid)}"]`);
+          if (a) {
+            a.classList.add('has-altered-cc');
+            const badge = document.createElement('span');
+            badge.className   = 'altered-count';
+            badge.textContent = count;
+            badge.title       = `${count} ALTERED_CC line${count === 1 ? '' : 's'}`;
+            a.appendChild(badge);
+          }
+        }
+
+        const total = document.querySelectorAll('a[data-version-uid]').length;
+        status.textContent = `Done — ${withAltered} of ${total} user episode${total === 1 ? '' : 's'} ha${withAltered === 1 ? 's' : 've'} ALTERED_CC`;
+      } catch (e) {
+        status.textContent = String(e);
+      }
+
+      btn.disabled = false;
     }
 
     function post(body) {

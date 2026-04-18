@@ -223,6 +223,7 @@
 
     /* Matched rows — greyed out by default */
     .row-match { opacity: 0.3; }
+    .row-match:hover { opacity: 0.7; }
     .row-match.show-matched { opacity: 1; }
     .row-match.show-matched .col-text { color: #aaa; }
 
@@ -249,6 +250,36 @@
     .speaker-user    { color: #aae; }
     .speaker-result  { color: #aaa; }
     .speaker-altered { color: #f44336; font-weight: 600; }
+
+    select.speaker-select {
+      background: #1a0a0a;
+      color: #f44336;
+      border: 1px solid #5a1a1a;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 2px 4px;
+      cursor: pointer;
+      max-width: 140px;
+    }
+    select.speaker-select:focus { outline: 1px solid #c00; }
+
+    .col-remove {
+      width: 24px;
+      padding: 0 4px !important;
+      text-align: center;
+    }
+
+    button.remove-row-btn {
+      background: none;
+      border: none;
+      color: #f00;
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    button.remove-row-btn:hover { color: #f44336; }
   </style>
 </head>
 <body>
@@ -264,10 +295,13 @@
       <button class="btn-subtle" onclick="jumpToAltered(-1)">↑ Prev ALTERED_CC</button>
       <button class="btn-subtle" onclick="jumpToAltered(1)">↓ Next ALTERED_CC</button>
       <label id="show-matched-label">
-        <input type="checkbox" id="show-matched" onchange="toggleMatched()" /> Show matched
+        <input type="checkbox" id="show-matched" onchange="toggleMatched()" checked /> Show matched
       </label>
       <label id="use-altered-cc-label" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#aaa;cursor:pointer;user-select:none" title="When unchecked, unmatched captions use the nearest annotation's speaker instead">
         <input type="checkbox" id="use-altered-cc" checked onchange="reload()" /> Use ALTERED_CC
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#aaa;cursor:pointer;user-select:none" title="Also flag captions where the text changed, not just the duration">
+        <input type="checkbox" id="compare-text" onchange="reload()" /> Compare text
       </label>
       <button class="btn" id="save-btn" onclick="save()">Save</button>
       <span id="save-msg"></span>
@@ -287,6 +321,7 @@
               <th class="col-speaker col-header-user">User speaker</th>
               <th class="col-text col-header-result col-divider">Result text</th>
               <th class="col-speaker col-header-result">Result speaker</th>
+              <th class="col-remove"></th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -302,9 +337,10 @@
 
     const POLL_INTERVAL_MS = 250;
 
-    let pageData         = null;
-    let alteredIndices   = [];   // row indices (in alignedRows) of result-only rows
-    let activeAlteredIdx = -1;
+    let pageData             = null;
+    let alteredIndices       = [];   // row indices (in alignedRows) of result-only rows
+    let activeAlteredIdx     = -1;
+    let deletedResultIndices = new Set();
     let ytPlayer         = null;
     let ytPlayerReady    = false;
     let rowStarts      = [];   // numeric start time per aligned row (for binary search)
@@ -392,15 +428,42 @@
 
     // ── Rendering ────────────────────────────────────────────────────────────
 
+    function updateAlteredCount() {
+      const count = [...document.querySelectorAll('select.speaker-select')]
+        .filter(s => s.value === 'ALTERED_CC').length;
+      const el = document.querySelector('#summary .count-altered');
+      if (el) el.textContent = count;
+    }
+
+    function removeRow(resultIdx, rowIndex) {
+      if (resultIdx !== null) deletedResultIndices.add(resultIdx);
+      const tr = document.querySelector(`tr[data-index="${rowIndex}"]`);
+      if (tr) tr.remove();
+      updateAlteredCount();
+    }
+
     function renderTable(data) {
       const aligned = buildAlignedRows(data.user_captions, data.result_captions, data.row_matches);
 
-      alteredIndices = [];
+      alteredIndices       = [];
+      deletedResultIndices = new Set();
       rowStarts    = aligned.map(r => parseStart((r.left || r.right).start));
 
       const showMatched = document.getElementById('show-matched').checked;
+      const speakers    = data.speakers || [];
+
+      // Build a map from result caption start time → index in result_captions
+      const resultStartToIdx = {};
+      data.result_captions.forEach((c, i) => {
+        resultStartToIdx[parseStart(c.start)] = i;
+      });
+
+      const speakerOptions = [...speakers, 'Other', 'MULTIPLE'].map(s =>
+        `<option value="${escHtml(s)}">${escHtml(s)}</option>`
+      ).join('');
 
       const tbody = document.getElementById('tbody');
+      tbody.onchange = e => { if (e.target.matches('select.speaker-select')) updateAlteredCount(); };
       tbody.innerHTML = aligned.map((row, i) => {
         if (row.type === 'result-only') alteredIndices.push(i);
 
@@ -412,8 +475,21 @@
         const rightText= row.right ? escHtml(truncate(row.right.text, 55)) : '';
         const rightSpkr= row.right ? escHtml(row.right.speaker || '')      : '';
 
-        const isAltered    = row.right && row.right.speaker === 'ALTERED_CC';
-        const rightSpkrCls = isAltered ? 'speaker-altered' : 'speaker-result';
+        const isAltered = row.right && row.right.speaker === 'ALTERED_CC';
+
+        let rightSpkrCell;
+        if (isAltered) {
+          const resultIdx = resultStartToIdx[parseStart(row.right.start)];
+          rightSpkrCell = `<td class="col-speaker speaker-altered">` +
+            `<select class="speaker-select" data-result-index="${resultIdx}">` +
+            `<option value="ALTERED_CC">ALTERED_CC</option>${speakerOptions}` +
+            `</select></td>`;
+        } else {
+          rightSpkrCell = `<td class="col-speaker speaker-result">${rightSpkr}</td>`;
+        }
+
+        const resultIdx = row.right ? resultStartToIdx[parseStart(row.right.start)] : null;
+        const removeArg = resultIdx != null ? resultIdx : 'null';
 
         let cls = row.type === 'match'       ? 'row-match' :
                   row.type === 'user-only'   ? 'row-user-only' :
@@ -425,7 +501,8 @@
           <td class="col-text">${leftText}</td>
           <td class="col-speaker speaker-user">${leftSpkr}</td>
           <td class="col-text col-divider">${rightText}</td>
-          <td class="col-speaker ${rightSpkrCls}">${rightSpkr}</td>
+          ${rightSpkrCell}
+          <td class="col-remove"><button class="remove-row-btn" onclick="removeRow(${removeArg},${i})" title="Remove line from result">×</button></td>
         </tr>`;
       }).join('');
     }
@@ -537,6 +614,16 @@
       msg.textContent = '';
       msg.className   = '';
 
+      // Apply dropdown speaker selections to result_captions before saving
+      document.querySelectorAll('select.speaker-select').forEach(sel => {
+        const idx = parseInt(sel.dataset.resultIndex, 10);
+        if (!isNaN(idx) && pageData.result_captions[idx]) {
+          pageData.result_captions[idx].speaker = sel.value;
+        }
+      });
+
+      const captions = pageData.result_captions.filter((_, i) => !deletedResultIndices.has(i));
+
       try {
         const res = await fetch('./transcripts.py', {
           method:  'POST',
@@ -545,7 +632,7 @@
             id:       pageData.youtube_id,
             title:    pageData.episode_title,
             user_uid: pageData.user_uid,
-            captions: pageData.result_captions,
+            captions,
           }),
         });
         const data = await res.json();
@@ -579,9 +666,10 @@
       }
 
       const useAlteredCc = document.getElementById('use-altered-cc')?.checked ?? true;
+      const compareText  = document.getElementById('compare-text')?.checked ?? false;
 
       try {
-        const res  = await fetch(`./reapply.py?user=${encodeURIComponent(adminUid)}&version=${encodeURIComponent(versionUid)}&altered_cc=${useAlteredCc ? '1' : '0'}`);
+        const res  = await fetch(`./reapply.py?user=${encodeURIComponent(adminUid)}&version=${encodeURIComponent(versionUid)}&altered_cc=${useAlteredCc ? '1' : '0'}&compare_text=${compareText ? '1' : '0'}`);
         const data = await res.json();
         if (!res.ok) { showError(data.error); return; }
 
