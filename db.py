@@ -605,6 +605,51 @@ def get_all_locations():
         conn.close()
 
 
+def get_user_latency():
+    """Return non-complete user-episode assignments, sorted oldest activity first."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT u.name, u.uid, e.title, e.uid, s.name, season.number, e.number,
+                      MAX(v.created_at) AS last_save, ue.created_at AS assigned_at,
+                      COUNT(v.uid) AS version_count,
+                      (SELECT filepath FROM versions
+                       WHERE episode_uid = e.uid AND user_uid = u.uid
+                       ORDER BY version_number DESC LIMIT 1) AS latest_filepath
+               FROM user_episodes ue
+               JOIN users u ON u.uid = ue.user_uid
+               JOIN episodes e ON e.uid = ue.episode_uid
+               JOIN seasons season ON season.uid = e.season_uid
+               JOIN shows s ON s.uid = season.show_uid
+               LEFT JOIN versions v ON v.episode_uid = e.uid AND v.user_uid = u.uid
+               WHERE COALESCE(ue.is_complete, 0) = 0
+                 AND COALESCE(u.is_admin, 0) = 0
+                 AND COALESCE(u.is_test_account, 0) = 0
+                 AND COALESCE(season.is_complete, 0) = 0
+               GROUP BY u.uid, u.name, e.uid, e.title, s.name, season.number, e.number, ue.created_at
+               ORDER BY COALESCE(MAX(v.created_at), ue.created_at) ASC""",
+        )
+        return [
+            {
+                "user_name":      row[0],
+                "user_uid":       row[1],
+                "episode_title":  row[2],
+                "episode_uid":    row[3],
+                "show_name":      row[4],
+                "season_number":  row[5],
+                "episode_number": row[6],
+                "last_save_at":   row[7].replace(tzinfo=_EASTERN).isoformat() if row[7] else None,
+                "assigned_at":    row[8].replace(tzinfo=_EASTERN).isoformat() if row[8] else None,
+                "version_count":  int(row[9]),
+                "latest_filepath": row[10],
+            }
+            for row in cur.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
 def get_all_seasons():
     """Return all seasons with their show name, ordered by show then season number."""
     conn = get_db_connection()

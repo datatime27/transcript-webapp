@@ -31,7 +31,7 @@ from db import (
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
     get_user_info, get_episode_info, get_user_episode_count,
     set_season_speakers, set_location_season, update_user_location,
-    get_reapply_data,
+    get_reapply_data, get_user_latency,
 )
 from annotation_utils import apply_annotations
 from mail import send_email
@@ -69,7 +69,33 @@ def valid_id(uid):
     return uid and all(c.isalnum() or c in "-_" for c in uid)
 
 
+def _last_modified_time(filepath):
+    """Return the start time of the last modified=true caption as 'H:MM:SS', or None."""
+    if not filepath:
+        return None
+    try:
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, filepath), encoding="utf-8") as f:
+            data = json.load(f)
+        last = None
+        for c in data.get("captions", []):
+            if c.get("modified"):
+                last = c
+        if last is None:
+            return None
+        secs = float(str(last["start"]).strip().rstrip("s"))
+        h = int(secs // 3600)
+        m = int((secs % 3600) // 60)
+        s = int(secs % 60)
+        return f"{h}:{m:02d}:{s:02d}"
+    except Exception:
+        return None
+
+
 def action_load_data():
+    latency = get_user_latency()
+    for row in latency[:10]:
+        row["latest_modification"] = _last_modified_time(row.get("latest_filepath"))
     return "200 OK", json.dumps({
         "users":                       get_all_users(),
         "episodes":                    get_all_episodes(),
@@ -78,6 +104,7 @@ def action_load_data():
         "locations":                   get_all_locations(),
         "seasons":                     get_all_seasons(),
         "wants_more_suggestions":      get_wants_more_suggestions(),
+        "user_latency":                latency,
     }, ensure_ascii=False)
 
 
