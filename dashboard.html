@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Taskmaster Annotation Progress</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 18px; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    h1 { font-size: 1.4rem; color: #fff; margin-bottom: 12px; text-align: center; }
+
+    a { color: cyan; }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+
+    #load-error { color: #f88; font-size: 0.9rem; margin-bottom: 16px; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      margin-bottom: 12px;
+      padding: 12px 16px;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      font-size: 0.72rem;
+      color: #fff;
+    }
+
+    .legend-section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+    }
+
+    .legend-section + .legend-section {
+      padding-left: 16px;
+      border-left: 1px solid #2a2a2a;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; flex: 1 0 130px; }
+
+    .legend-tile { width: 13px; height: 13px; border-radius: 3px; }
+
+    /* Show groups */
+    .shows-layout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 48px;
+      align-items: flex-start;
+    }
+
+    .shows-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .show-group { margin-bottom: 32px; }
+
+    @media (max-width: 600px) {
+      body { padding: 20px 16px; }
+      .shows-layout { gap: 0; }
+    }
+
+    @media (max-width: 380px) {
+      .ep-tile { width: 18px; height: 18px; }
+      .episode-grid { gap: 2px; }
+      .season-label { width: 22px; }
+    }
+
+    .show-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 8px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    /* Season rows */
+    .season-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .season-label {
+      font-size: 0.65rem;
+      width: 26px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .season-stats {
+      font-size: 0.65rem;
+      white-space: nowrap;
+      min-width: 32px;
+    }
+
+    /* Episode grid */
+    .episode-grid {
+      display: flex;
+      gap: 3px;
+    }
+
+    .ep-tile {
+      width: 25px;
+      height: 25px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      cursor: default;
+      transition: filter 0.1s;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .ep-tile:hover { filter: brightness(1.4); }
+
+    /* Tile status backgrounds */
+    .ep-missing { background: #333333; }
+    .ep-empty   { background: #777777; }
+    .ep-red     { background: #ff0000; }
+    .ep-yellow  { background: #ffff00; }
+    .ep-orange  { background: #ff9b00; }
+    .ep-green   { background: #00ff00; }
+
+    .season-row.complete .season-label,
+    .season-row.complete .season-stats { color: #98ffc0; }
+
+    /* Tooltip */
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      background: #1c1c1c;
+      border: 1px solid #363636;
+      border-radius: 6px;
+      padding: 9px 13px;
+      font-size: 0.72rem;
+      max-width: 230px;
+      display: none;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.65);
+    }
+
+    .tt-title {
+      font-weight: 600;
+      color: #fff;
+      font-size: 0.78rem;
+      margin-bottom: 7px;
+    }
+
+    .tt-row { margin-bottom: 3px; }
+
+    .tt-empty { color: #ffffff; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Taskmaster Annotation Progress</h1>
+  <p class="subtitle">Here is the progress the volunteers have made annotating transcripts. If you'd like to volunteer sign up here: <a href="./signup.html">I want to volunteer!</a></p>
+  <div id="load-error"></div>
+
+  <div class="legend">
+    <div class="legend-section">
+      <div class="legend-item"><div class="legend-tile ep-missing"></div> Not downloaded</div>
+      <div class="legend-item"><div class="legend-tile ep-empty"></div> No users assigned</div>
+      <div class="legend-item"><div class="legend-tile ep-red"></div> None started</div>
+      <div class="legend-item"><div class="legend-tile ep-yellow"></div> In progress</div>
+      <div class="legend-item"><div class="legend-tile ep-orange"></div> Partially complete</div>
+      <div class="legend-item"><div class="legend-tile ep-green"></div> Complete</div>
+    </div>
+  </div>
+
+  <div id="content"><p style="color:#555">Loading…</p></div>
+
+  <div id="tooltip">
+    <div class="tt-title" id="tt-title"></div>
+    <div id="tt-body"></div>
+  </div>
+
+<script>
+  const SHOWS = [
+    { name: 'Taskmaster UK', seasons: 21 },
+    { name: 'Taskmaster AU', seasons: 4  },
+    { name: 'Taskmaster NZ', seasons: 6  },
+  ];
+  const EPS_PER_SEASON = 10;
+
+  loadData();
+
+  async function loadData() {
+    const res  = await fetch('./dashboard.py');
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('load-error').textContent = data.error || 'Failed to load';
+      return;
+    }
+    render(data.episodes);
+  }
+
+  const episodeData = [];
+
+  function tileStatus(ep) {
+    if (ep.__missing)         return 'missing';
+    if (!ep.user_count)       return 'empty';
+    if (ep.has_merged || ep.complete_count >= 3) return 'green';
+    if (ep.complete_count >= 1)                  return 'orange';
+    if (ep.started_count  >= 1)                  return 'yellow';
+    return 'red';
+  }
+
+  function renderTile(ep) {
+    const idx = episodeData.length;
+    episodeData.push(ep);
+    return `<div class="ep-tile ep-${tileStatus(ep)}" data-idx="${idx}"
+                 onmouseenter="showTooltip(event,this)"
+                 onmousemove="moveTooltip(event)"
+                 onmouseleave="hideTooltip()"></div>`;
+  }
+
+  function seasonStats(eps) {
+    let total = 0, done = 0;
+    for (const ep of eps) {
+      if (ep.__missing || !ep.user_count) continue;
+      total++;
+      const s = tileStatus(ep);
+      if (s === 'green') done++;
+    }
+    return { total, done };
+  }
+
+  function renderSeasonRow(season, eps, isComplete) {
+    const { total, done } = seasonStats(eps);
+    const stat = total ? `${done}/${total}` : '';
+    return `<div class="season-row${isComplete ? ' complete' : ''}">
+      <div class="season-label">S${season}</div>
+      <div class="episode-grid">${eps.map(renderTile).join('')}</div>
+      <div class="season-stats">${stat}</div>
+    </div>`;
+  }
+
+  function renderShowGroup(showName, seasonRows) {
+    return `<div class="show-group">
+      <div class="show-name">${escHtml(showName)}</div>
+      ${seasonRows.join('')}
+    </div>`;
+  }
+
+  function render(dbEpisodes) {
+    const dbMap = new Map();
+    const seasonCompleteSet = new Set();
+    for (const ep of dbEpisodes) {
+      dbMap.set(`${ep.show_name}|${ep.season_number}|${ep.episode_number}`, ep);
+      if (ep.season_complete) seasonCompleteSet.add(`${ep.show_name}|${ep.season_number}`);
+    }
+
+    const showGroups = new Map();
+    for (const show of SHOWS) {
+      const rows = [];
+      for (let s = 1; s <= show.seasons; s++) {
+        const eps = [];
+        for (let e = 1; e <= EPS_PER_SEASON; e++) {
+          eps.push(dbMap.get(`${show.name}|${s}|${e}`) || {
+            __missing: true, show_name: show.name, season_number: s, episode_number: e,
+          });
+        }
+        rows.push(renderSeasonRow(s, eps, seasonCompleteSet.has(`${show.name}|${s}`)));
+      }
+      showGroups.set(show.name, rows);
+    }
+
+    const [firstName, ...restNames] = [...showGroups.keys()];
+    const leftHtml  = renderShowGroup(firstName, showGroups.get(firstName));
+    const rightHtml = restNames.map(n => renderShowGroup(n, showGroups.get(n))).join('');
+
+    document.getElementById('content').innerHTML =
+      `<div class="shows-layout">
+        <div>${leftHtml}</div>
+        <div class="shows-right">${rightHtml}</div>
+      </div>`;
+  }
+
+  const tooltip = document.getElementById('tooltip');
+  const ttTitle = document.getElementById('tt-title');
+  const ttBody  = document.getElementById('tt-body');
+
+  function showTooltip(e, el) {
+    const ep = episodeData[parseInt(el.dataset.idx)];
+    ttTitle.textContent = `${ep.show_name} S${ep.season_number} E${ep.episode_number}`;
+    if (ep.__missing) {
+      ttBody.innerHTML = '<div class="tt-empty">Not yet in database</div>';
+    } else if (!ep.user_count) {
+      ttBody.innerHTML = '<div class="tt-empty">No users assigned</div>';
+    } else {
+      const notStarted = ep.user_count - ep.started_count;
+      const inProgress = ep.started_count - ep.complete_count;
+      const lines = [];
+      if (ep.complete_count) lines.push(`${ep.complete_count} complete`);
+      if (inProgress > 0)    lines.push(`${inProgress} in progress`);
+      if (notStarted > 0)    lines.push(`${notStarted} not started`);
+      ttBody.innerHTML = lines.map(l => `<div class="tt-row">${escHtml(l)}</div>`).join('');
+    }
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  }
+
+  function moveTooltip(e) { positionTooltip(e); }
+
+  function positionTooltip(e) {
+    const pad = 14;
+    const tw  = tooltip.offsetWidth;
+    const th  = tooltip.offsetHeight;
+    let x = e.clientX + pad;
+    let y = e.clientY + pad;
+    if (x + tw > window.innerWidth  - 8) x = e.clientX - tw - pad;
+    if (y + th > window.innerHeight - 8) y = e.clientY - th - pad;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+
+  function hideTooltip() { tooltip.style.display = 'none'; }
+
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>

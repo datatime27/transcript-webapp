@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running the app
 
-Deploy to a CGI-capable web server. `transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, and `signup.py` must be executable. Transcript JSON files go in the `transcripts/` directory. Users are accessed via `viewer.html?user={uid}`. Admins use `merge.html?user={uid}` and `admin.html?user={uid}`. New users register via `signup.html`.
+Deploy to a CGI-capable web server. `transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`, and `dashboard.py` must be executable. Transcript JSON files go in the `transcripts/` directory. Users are accessed via `viewer.html?user={uid}`. Admins use `merge.html?user={uid}` and `admin.html?user={uid}`. New users register via `signup.html`.
 
 ## Architecture
 
-Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`, `signup.html`) — all HTML, CSS, and JS inline. Python CGI backends (`transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`). MySQL database via `db.py`. Email via `mail.py`.
+Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`, `signup.html`, `dashboard.html`) — all HTML, CSS, and JS inline. Python CGI backends (`transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`, `dashboard.py`). MySQL database via `db.py`. Email via `mail.py`.
 
 **viewer.html flow:**
 1. On load, fetches `./transcripts.py?user={uid}` → `{name, episodes: [{version_id, title, version, episode_uid, is_complete}]}`. Displays username on load screen. Populates load-screen dropdown and in-app episode switcher.
@@ -59,6 +59,18 @@ Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`
 - `start` may be a string like `"    0.00s"` or a bare number — always coerce with `String(start)` before calling `.trim()`.
 - `speaker` is a full name from the `SPEAKERS` array, a raw `SPEAKER_*` label, or `UNKNOWN`.
 - `modified: true` marks captions manually reassigned from a named speaker.
+
+## dashboard.html / dashboard.py
+
+Public progress dashboard at `dashboard.html`. No authentication required — accessible to anyone. Shows episode annotation progress across all shows and seasons as a colour-coded tile grid.
+
+`dashboard.py` GET: no parameters. Returns `{episodes: [{show_name, season_number, episode_number, has_merged, season_complete, user_count, started_count, complete_count}]}`. Filters out admin and test users server-side via a subquery (`COALESCE(is_admin, 0) = 0 AND COALESCE(is_test_account, 0) = 0`) — no user names, UIDs, or emails are exposed. `dashboard.py` must be executable.
+
+**Tile colours:** dark grey = not in DB, grey = no users assigned, red = none started, yellow = in progress, orange = 1–2 complete, green = 3+ complete or merged. `has_merged` counts as green regardless of `complete_count`.
+
+**Tooltip:** shows anonymous counts only — "X complete / Y in progress / Z not started". No per-user info.
+
+**Layout:** `shows-layout` uses `flex-wrap: wrap` so shows stack vertically on mobile. Season rows are sized to fit a ~325px content width; mobile breakpoint at 600px reduces padding, and 380px breakpoint shrinks tiles to 18px.
 
 ## signup.html / signup.py
 
