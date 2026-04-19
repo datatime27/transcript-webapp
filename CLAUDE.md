@@ -134,7 +134,11 @@ The `ae-episode` select uses `<optgroup>` elements to group episodes by show+sea
 
 ## viewer.html load screen
 
-The load screen has an **Open** button and an **"I'm ready for a new episode"** button. Clicking the latter POSTs `{action: "wants_more", user_uid}` to `transcripts.py`, which validates the user exists (returns 404 if not), sets `wants_more=1`, and emails the admin. On success the button is replaced with "You will receive an email when your new episode is ready".
+The load screen has an **Open** button and an **"I'm ready for a new episode"** button. Clicking the latter POSTs `{action: "wants_more", user_uid}` to `transcripts.py`, which validates the user exists (returns 404 if not), sets `wants_more=1`, and emails the admin via `notify_wants_more()`. On success the button is replaced with "You will receive an email when your new episode is ready".
+
+The in-app **I'm Done!** modal also has an **"I'm ready for another episode"** checkbox. When checked, the save POST includes `wants_more: true`; `transcripts.py` sets `wants_more=1` and calls `notify_wants_more()` — same DB flag and email as the load-screen button.
+
+`notify_wants_more(user_uid)` in `transcripts.py` is a shared helper: looks up user info and sends the admin notification email.
 
 **Unknown user handling:** `transcripts.py` GET `?user=` returns 404 `{"error": "User not found"}` when the uid doesn't exist. `viewer.html` parses the JSON body to confirm it's a user-not-found 404 (not a missing-file 404), then shows a message with a `.cyan-link` styled link to `signup.html`. No dropdown or buttons are shown.
 

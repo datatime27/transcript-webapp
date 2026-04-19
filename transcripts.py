@@ -29,6 +29,19 @@ try:
     def valid_id(uid):
         return uid and all(c.isalnum() or c in "-_" for c in uid)
 
+    def notify_wants_more(user_uid):
+        info = get_user_info(user_uid)
+        if not info:
+            return
+        user_name     = info.get("name") or user_uid
+        user_email    = info.get("email") or "unknown"
+        user_location = info.get("location") or "unknown"
+        send_email(
+            to      = get_admin_email(),
+            subject = f"{user_name} is ready for a new episode",
+            body    = f"**{user_name}** has clicked 'I'm ready for a new episode'.\n\n**Email:** {user_email}\n**Location:** {user_location}\n\nAssign them a new episode when one is available.",
+        )
+
     def handle_get():
         global status, body
         params      = parse_qs(os.environ.get("QUERY_STRING", ""))
@@ -102,15 +115,7 @@ try:
                 body   = json.dumps({"error": "User not found"})
                 return
             set_wants_more(user_uid, True)
-            user_name = info.get("name") or user_uid
-            user_email    = info.get("email") or "unknown"
-            user_location = info.get("location") or "unknown"
-            admin_email = get_admin_email()
-            send_email(
-                to      = admin_email,
-                subject = f"{user_name} is ready for a new episode",
-                body    = f"**{user_name}** has clicked 'I'm ready for a new episode'.\n\n**Email:** {user_email}\n**Location:** {user_location}\n\nAssign them a new episode when one is available.",
-            )
+            notify_wants_more(user_uid)
             body = json.dumps({"ok": True})
             return
 
@@ -137,6 +142,7 @@ try:
                 set_episode_complete(video_id, user_uid)
             if wants_more and user_uid:
                 set_wants_more(user_uid, True)
+                notify_wants_more(user_uid)
         except ValueError as e:
             status = "404 Not Found"
             body   = json.dumps({"error": str(e)})
