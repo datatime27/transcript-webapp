@@ -132,6 +132,8 @@
     }
     #wants-more-btn:hover { background: #333; color: #e0e0e0; }
     #wants-more-msg { color: #4caf50; font-size: 0.9rem; margin-top: 8px; }
+    a.cyan-link { color: #00ffff; text-decoration: underline; }
+    a.cyan-link:hover { color: #aaffff; }
 
     #transcript-select {
       padding: 10px 14px;
@@ -1432,8 +1434,16 @@
     try {
       const url = `./transcripts.py?user=${encodeURIComponent(userUid)}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const { name, episodes: list } = await res.json();
+      const resData = await res.json().catch(() => null);
+      if (res.status === 404 && resData?.error === 'User not found') {
+        statusEl.style.display = 'none';
+        const errEl = document.getElementById('load-error');
+        errEl.innerHTML = 'User not found. If you would like to volunteer, <a href="./signup.html" class="cyan-link">sign up here</a> to get started.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!res.ok) throw new Error(resData?.error || `Server returned ${res.status}`);
+      const { name, episodes: list } = resData;
       if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
       if (!list.length) {
         statusEl.textContent = 'No available transcripts currently assigned to you.';

@@ -11,7 +11,7 @@ Deploy to a CGI-capable web server. `transcripts.py`, `merge.py`, `admin.py`, `r
 Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`, `signup.html`, `dashboard.html`) — all HTML, CSS, and JS inline. Python CGI backends (`transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`, `dashboard.py`). MySQL database via `db.py`. Email via `mail.py`.
 
 **viewer.html flow:**
-1. On load, fetches `./transcripts.py?user={uid}` → `{name, episodes: [{version_id, title, version, episode_uid, is_complete}]}`. Displays username on load screen. Populates load-screen dropdown and in-app episode switcher.
+1. On load, fetches `./transcripts.py?user={uid}` → `{name, episodes: [{version_id, title, version, episode_uid, is_complete}]}`. Returns 404 `{"error": "User not found"}` if uid is unknown — viewer shows a message with a link to `signup.html` and no buttons. Displays username on load screen. Populates load-screen dropdown and in-app episode switcher.
 2. If `?episode={episode_uid}` is in the URL, skips the load screen and auto-loads that episode.
 3. User selects an episode and clicks Open. Fetches `./transcripts.py?version={version_id}` for the full JSON.
 4. `loadTranscript()` is called: runs `applyBracketedNameOverrides()`, renders the transcript, initialises the YouTube player, and seeks to the last `modified=true` caption without auto-playing.
@@ -132,7 +132,9 @@ The `ae-episode` select uses `<optgroup>` elements to group episodes by show+sea
 
 ## viewer.html load screen
 
-The load screen has an **Open** button and an **"I'm ready for a new episode"** button. Clicking the latter POSTs `{action: "wants_more", user_uid}` to `transcripts.py`, which sets `wants_more=1` on the user and emails the admin. On success the button is replaced with "You will receive an email when your new episode is ready".
+The load screen has an **Open** button and an **"I'm ready for a new episode"** button. Clicking the latter POSTs `{action: "wants_more", user_uid}` to `transcripts.py`, which validates the user exists (returns 404 if not), sets `wants_more=1`, and emails the admin. On success the button is replaced with "You will receive an email when your new episode is ready".
+
+**Unknown user handling:** `transcripts.py` GET `?user=` returns 404 `{"error": "User not found"}` when the uid doesn't exist. `viewer.html` parses the JSON body to confirm it's a user-not-found 404 (not a missing-file 404), then shows a message with a `.cyan-link` styled link to `signup.html`. No dropdown or buttons are shown.
 
 ## locations table
 

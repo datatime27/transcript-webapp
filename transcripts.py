@@ -62,8 +62,13 @@ try:
                 status = "400 Bad Request"
                 body   = json.dumps({"error": "Invalid user id"})
                 return
+            name = get_user_name(user_uid)
+            if name is None:
+                status = "404 Not Found"
+                body   = json.dumps({"error": "User not found"})
+                return
             body = json.dumps({
-                "name":     get_user_name(user_uid),
+                "name":     name,
                 "episodes": get_episodes_for_user(user_uid),
             })
 
@@ -91,10 +96,14 @@ try:
                 status = "400 Bad Request"
                 body   = json.dumps({"error": "Invalid or missing user_uid"})
                 return
+            info = get_user_info(user_uid)
+            if not info:
+                status = "404 Not Found"
+                body   = json.dumps({"error": "User not found"})
+                return
             set_wants_more(user_uid, True)
-            info = get_user_info(user_uid) or {}
             user_name = info.get("name") or user_uid
-            user_email = info.get("email") or "unknown"
+            user_email    = info.get("email") or "unknown"
             user_location = info.get("location") or "unknown"
             admin_email = get_admin_email()
             send_email(
