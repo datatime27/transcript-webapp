@@ -33,6 +33,17 @@ parser.add_argument(
     help="Discard captions with start time >= this value. Format: MM:SS or HH:MM:SS (default: 60:00)."
 )
 parser.add_argument(
+    '--transcribe',
+    action='store_true',
+    help="Transcribe the MP3 using WhisperX instead of loading a JSON transcript."
+)
+parser.add_argument(
+    '--model',
+    type=str,
+    default='large-v2',
+    help="WhisperX model to use when --transcribe is set (default: large-v2)."
+)
+parser.add_argument(
     'video_id',
     help="YouTube video ID (e.g. rwKYWuVluJc). Used to derive all input and output filenames."
 )
@@ -55,7 +66,7 @@ AUDIO_FILE        = f"audio/{VIDEO_ID}.mp3"
 JSON_FILE         = f"C:\\Peter\\Software\\data-time-repos\\word-tracker\\transcripts\\taskmaster\\{VIDEO_ID}.json"
 
 # Validate input files exist before doing any heavy work
-if not os.path.exists(JSON_FILE):
+if not args.transcribe and not os.path.exists(JSON_FILE):
     parser.error(f"JSON transcript not found: {JSON_FILE}")
 if not os.path.exists(AUDIO_FILE):
     parser.error(f"Audio file not found: {AUDIO_FILE}")
@@ -74,42 +85,60 @@ MAX_SPEAKERS      = 9         # In case of extra voices
 
 
 # ─────────────────────────────────────────────
-# STEP 1 — LOAD AND PREPARE JSON CAPTIONS
+# STEP 1 — LOAD AND PREPARE CAPTIONS
 # ─────────────────────────────────────────────
-print("Loading JSON transcript...")
-with open(JSON_FILE, encoding='utf-8') as f:
-    data = json.load(f)
+print("\nLoading audio...")
+audio = whisperx.load_audio(AUDIO_FILE)
 
-raw_captions = data['captions']
-captions     = preprocess_captions(raw_captions)
-print(f"  Captions after splitting: {len(captions)} (was {len(raw_captions)})")
+if args.transcribe:
+    print(f"Loading Whisper model ({args.model})...")
+    whisper_model = whisperx.load_model(args.model, DEVICE, language=LANGUAGE)
+    print("Transcribing...")
+    transcribe_result = whisper_model.transcribe(audio, batch_size=16)
+    print(f"  Transcribed {len(transcribe_result['segments'])} segments")
 
-before   = len(captions)
-captions = [c for c in captions if c['start'] < trim_seconds]
-print(f"  Trimmed to {len(captions)} captions (removed {before - len(captions)} after {args.trim})")
+    print("Aligning words...")
+    model_a, metadata = whisperx.load_align_model(
+        language_code=transcribe_result["language"], device=DEVICE
+    )
+    aligned_result = whisperx.align(
+        transcribe_result["segments"], model_a, metadata, audio, DEVICE
+    )
+    print(f"  Aligned {len(aligned_result['segments'])} segments")
 
-# Apply drift correction multiplier if drift is specified
-if args.drift != 0.0:
-    final_json_time  = max(c['start'] for c in captions)
-    drift_multiplier = (final_json_time - args.drift) / final_json_time
-    print(f"  Drift correction: final={final_json_time:.2f}s, drift={args.drift}s, multiplier={drift_multiplier:.6f}")
-    for c in captions:
-        c['start'] = round(c['start'] * drift_multiplier, 2)
+    data = {'id': VIDEO_ID, 'title': '', 'captions': []}
+    transcript_result = aligned_result
 else:
-    print("  No drift correction applied")
+    print("Loading JSON transcript...")
+    with open(JSON_FILE, encoding='utf-8') as f:
+        data = json.load(f)
 
-# Convert captions to WhisperX segment format
-wx_segments = captions_to_whisperx_segments(captions)
-print(f"  Converted to {len(wx_segments)} WhisperX segments")
+    raw_captions = data['captions']
+    captions     = preprocess_captions(raw_captions)
+    print(f"  Captions after splitting: {len(captions)} (was {len(raw_captions)})")
+
+    before   = len(captions)
+    captions = [c for c in captions if c['start'] < trim_seconds]
+    print(f"  Trimmed to {len(captions)} captions (removed {before - len(captions)} after {args.trim})")
+
+    if args.drift != 0.0:
+        final_json_time  = max(c['start'] for c in captions)
+        drift_multiplier = (final_json_time - args.drift) / final_json_time
+        print(f"  Drift correction: final={final_json_time:.2f}s, drift={args.drift}s, multiplier={drift_multiplier:.6f}")
+        for c in captions:
+            c['start'] = round(c['start'] * drift_multiplier, 2)
+    else:
+        print("  No drift correction applied")
+
+    wx_segments = captions_to_whisperx_segments(captions)
+    print(f"  Converted to {len(wx_segments)} WhisperX segments")
+    transcript_result = {'segments': wx_segments}
 
 
 # ─────────────────────────────────────────────
 # STEP 2 — DIARIZE
 # ─────────────────────────────────────────────
-print("\nLoading audio...")
-audio = whisperx.load_audio(AUDIO_FILE)
-
-print("Loading diarization model...")
+print("\nLoading diarization model...")
 diarize_model = DiarizationPipeline(device=torch.device(DEVICE))
 
 print("Diarizing...")
@@ -132,19 +161,36 @@ print(f"  Written to {OUTPUT_DIARIZE}")
 # STEP 3 — ASSIGN SPEAKERS
 # ─────────────────────────────────────────────
 print("\nAssigning speakers...")
-transcript_result = {'segments': wx_segments}
 result = whisperx.assign_word_speakers(diarize_segments, transcript_result)
 
-# Map speaker labels back onto captions
-caption_iter = iter([c for c in captions if format_caption_text(c['text'])])
-for seg in result['segments']:
-    cap = next(caption_iter, None)
-    if cap:
-        speaker = seg.get('speaker', 'UNKNOWN')
-        # Override with 'Other' for pure sound effect captions
-        if re.fullmatch(r'\[.*\]', format_caption_text(cap['text']).strip()):
+if args.transcribe:
+    # Build captions directly from the transcribed+aligned segments
+    captions = []
+    for seg in result['segments']:
+        text = seg.get('text', '').strip()
+        if not text:
+            continue
+        start    = round(seg.get('start', 0), 2)
+        duration = round(seg.get('end', start) - seg.get('start', start), 3)
+        speaker  = seg.get('speaker', 'UNKNOWN')
+        if re.fullmatch(r'\[.*\]', text):
             speaker = 'Other'
-        cap['speaker'] = speaker
+        captions.append({'text': text, 'start': start, 'duration': duration, 'speaker': speaker})
+
+    before   = len(captions)
+    captions = [c for c in captions if c['start'] < trim_seconds]
+    if before != len(captions):
+        print(f"  Trimmed to {len(captions)} captions (removed {before - len(captions)} after {args.trim})")
+else:
+    # Map speaker labels back onto captions
+    caption_iter = iter([c for c in captions if format_caption_text(c['text'])])
+    for seg in result['segments']:
+        cap = next(caption_iter, None)
+        if cap:
+            speaker = seg.get('speaker', 'UNKNOWN')
+            if re.fullmatch(r'\[.*\]', format_caption_text(cap['text']).strip()):
+                speaker = 'Other'
+            cap['speaker'] = speaker
 
 
 # ─────────────────────────────────────────────

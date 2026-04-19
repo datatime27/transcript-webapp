@@ -17,17 +17,20 @@ tmp-outputs/                   # Intermediate/debug outputs
 
 rwKYWuVluJc.json               # Final output: annotated transcript JSON
 check_diarize_gpu.py           # GPU diagnostic script
-process-transcript.py          # Main script
+preprocess.py                  # Main script
 ```
 
 ## Running the Script
 
 ```bash
-# Basic usage
-python process-transcript.py <video_id>
+# Basic usage (JSON transcript required)
+python preprocess.py <video_id>
+
+# Transcribe the MP3 instead of loading a JSON transcript
+python preprocess.py <video_id> --transcribe
 
 # With drift correction (if JSON timecodes drift by ~2s over the episode)
-python process-transcript.py <video_id> --drift 2
+python preprocess.py <video_id> --drift 2
 ```
 
 ## Arguments
@@ -35,15 +38,18 @@ python process-transcript.py <video_id> --drift 2
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `video_id` | required | YouTube video ID, used to derive all filenames |
-| `--drift` | `0.0` | Seconds the JSON timecodes have drifted by end of file. Applies a linear multiplier: `(final_time - drift) / final_time` |
+| `--drift` | `0.0` | Seconds the JSON timecodes have drifted by end of file. Applies a linear multiplier: `(final_time - drift) / final_time`. Ignored when `--transcribe` is set. |
+| `--trim` | `60:00` | Discard captions with start time ≥ this value. Format: `MM:SS` or `HH:MM:SS`. |
+| `--transcribe` | off | Transcribe the MP3 using WhisperX instead of loading a JSON transcript. Output JSON gets `title: ""`. |
+| `--model` | `large-v2` | WhisperX Whisper model to use when `--transcribe` is set. |
 
 ## Pipeline
 
-### Step 1 — Load and prepare JSON captions
-- Loads the manual YouTube transcript JSON (`data['captions']`)
-- Splits multi-speaker captions separated by `\n-` into two separate captions, each with half the original duration
-- Applies drift correction if `--drift` is specified
-- Converts captions to the WhisperX segment format expected by `assign_word_speakers`
+### Step 1 — Load and prepare captions
+
+**Without `--transcribe`:** loads the manual YouTube transcript JSON, preprocesses captions (split multi-speaker, split sentences, normalise sound effects), applies trim and drift correction, converts to WhisperX segment format.
+
+**With `--transcribe`:** loads the Whisper model, transcribes the audio, then runs `whisperx.load_align_model()` + `whisperx.align()` to refine segment timestamps to word level. `load_align_model` downloads a language-specific wav2vec2 forced-alignment model (e.g. `jonatasgrosman/wav2vec2-large-xlsr-53-english`); word-level timestamps improve speaker assignment accuracy because diarization segments have sub-second resolution. Trim is applied after speaker assignment.
 
 ### Step 2 — Diarize
 - Loads audio with `whisperx.load_audio()`
@@ -51,8 +57,9 @@ python process-transcript.py <video_id> --drift 2
 - Writes raw diarization segments to `tmp-outputs/{video_id}-diarize.txt`
 
 ### Step 3 — Assign speakers
-- Calls `whisperx.assign_word_speakers(diarize_segments, transcript_result)` to match diarization speaker labels to JSON caption segments
+- Calls `whisperx.assign_word_speakers(diarize_segments, transcript_result)` to match diarization speaker labels to caption segments
 - Pure sound effect captions (entirely in brackets e.g. `[laughter]`) are labelled `Other` regardless of diarization output
+- With `--transcribe`, captions are built directly from the resulting segments (text, start, duration, speaker)
 
 ### Step 4 — Write output
 - Writes human-readable `tmp-outputs/{video_id}-aligned.txt`
