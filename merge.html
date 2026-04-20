@@ -123,21 +123,23 @@
     #diff-main {
       flex: 1;
       display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
 
     #player-panel {
-      flex: 0 0 38%;
+      flex: 0 0 40%;
       background: #000;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #2a2a2a;
+      width: 100%;
+      min-height: 10%;
+      max-height: 90%;
+      position: relative;
     }
 
     #player-container {
       position: relative;
       width: 100%;
-      padding-top: 56.25%; /* 16:9 */
+      height: 100%;
     }
 
     #player {
@@ -147,9 +149,20 @@
       height: 100%;
     }
 
+    #panel-splitter {
+      height: 5px;
+      cursor: row-resize;
+      background: #58b6b5;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #panel-splitter:hover, #panel-splitter.dragging { background: #555; }
+
     #table-wrap {
       flex: 1;
       overflow: auto;
+      width: 100%;
+      min-height: 10%;
     }
 
     .col-time { cursor: pointer; }
@@ -209,10 +222,21 @@
 
     .col-text {
       color: #e0e0e0;
-      max-width: 280px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .col-text.text-conflict,
+    .text-snippet {
+      color: #ff0000;
+      vertical-align: bottom;
+      font-weight: 600;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .text-snippet {
+      display: block;
+      margin-top: 2px;
     }
 
     .col-result {
@@ -272,24 +296,7 @@
       letter-spacing: 0.02em;
     }
 
-    .badge-t {
-      font-size: 0.68rem;
-      font-weight: 700;
-      color: #f80;
-      letter-spacing: 0.02em;
-    }
 
-    .text-snippet {
-      display: block;
-      font-size: 0.68rem;
-      color: #888;
-      font-style: italic;
-      margin-top: 2px;
-      max-width: 130px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
 
     .result-unresolved {
 	  color: red;
@@ -342,6 +349,7 @@
           <div id="player"></div>
         </div>
       </div>
+      <div id="panel-splitter"></div>
       <div id="table-wrap">
         <table class="diff-table">
           <thead id="thead"></thead>
@@ -608,10 +616,9 @@
 
       const seconds = parseFloat(String(baseCap.start || '').trim().replace('s', ''));
       const time    = escHtml(seconds.toFixed(2) + 's');
-      const text    = escHtml(truncate(baseCap.text || '', 70));
-      const tBadge  = unified.textConflict ? ' <span class="badge-t">T</span>' : '';
-
-      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="col-text">${text}${tBadge}</td>`;
+      const text    = escHtml(baseCap.text || '');
+      const textClass = unified.textConflict ? 'col-text text-conflict' : 'col-text';
+      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="${textClass}">${text}</td>`;
 
       unified.perVersion.forEach((cap, vi) => {
         const isDisabled = disabledVersions.has(vi);
@@ -626,9 +633,9 @@
           const clickAttr  = (agreed || isDisabled) ? '' : ` onclick="selectCell(${i}, ${vi})"`;
           const dimAttr    = isDisabled ? ' style="opacity:0.3"' : '';
           const snippet    = unified.textConflict
-            ? `<span class="text-snippet">${escHtml(truncate(cap.text || '', 28))}</span>`
+            ? `<span class="text-snippet">${escHtml(cap.text || '')}</span>`
             : '';
-          cells += `<td data-vi="${vi}"${dimAttr}><span class="speaker-cell${selected}"${clickAttr}>${escHtml(cap.speaker)}${mBadge}${snippet}</span></td>`;
+          cells += `<td data-vi="${vi}"${dimAttr}><span class="speaker-cell${selected}"${clickAttr}>${escHtml(cap.speaker)}${mBadge}</span>${snippet}</td>`;
         }
       });
 
@@ -787,6 +794,43 @@
       document.getElementById('load-screen').style.display  = 'flex';
       document.getElementById('save-btn').textContent = 'Save Merge';
     }
+
+    // ── Panel splitter ───────────────────────────────────────────────────────
+    (function () {
+      const splitter   = document.getElementById('panel-splitter');
+      const playerPanel = document.getElementById('player-panel');
+      const diffMain   = document.getElementById('diff-main');
+
+      const dragShield = document.createElement('div');
+      dragShield.style.cssText = 'position:absolute;inset:0;z-index:10;display:none;';
+      playerPanel.appendChild(dragShield);
+
+      splitter.addEventListener('mousedown', e => {
+        e.preventDefault();
+        splitter.classList.add('dragging');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        dragShield.style.display = 'block';
+
+        function onMouseMove(e) {
+          const rect = diffMain.getBoundingClientRect();
+          const pct  = ((e.clientY - rect.top) / rect.height) * 100;
+          playerPanel.style.flex = `0 0 ${Math.min(90, Math.max(10, pct))}%`;
+        }
+
+        function onMouseUp() {
+          splitter.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          dragShield.style.display = 'none';
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    })();
 
     // ── Utilities ────────────────────────────────────────────────────────────
 
