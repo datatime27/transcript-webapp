@@ -92,12 +92,14 @@ def get_recent_versions():
         cur = conn.cursor()
         cur.execute(
             """SELECT u.name, u.uid, e.title, s.name, season.number, e.number,
-                      v.version_number, v.created_at, v.uid
+                      v.version_number, v.created_at, v.uid,
+                      ue.is_complete
                FROM versions v
                JOIN users u ON u.uid = v.user_uid
                JOIN episodes e ON e.uid = v.episode_uid
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
+               JOIN user_episodes ue ON ue.episode_uid = v.episode_uid AND ue.user_uid = v.user_uid
                WHERE v.created_at >= NOW() - INTERVAL 7 DAY
                  AND v.user_uid IS NOT NULL
                  AND v.version_number = (
@@ -117,6 +119,7 @@ def get_recent_versions():
                 "version_number": row[6],
                 "created_at":     row[7].replace(tzinfo=_EASTERN).isoformat(),
                 "version_uid":    row[8],
+                "is_complete":    bool(row[9]),
             }
             for row in cur.fetchall()
         ]

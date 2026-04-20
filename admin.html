@@ -364,7 +364,7 @@
       margin-bottom: 16px;
     }
 
-    textarea { font-family: inherit; resize: vertical; }
+    textarea { font-family: inherit; resize: vertical; padding: 2px;}
 
     .section-note  { font-weight: 400; font-size: 0.8rem; }
     .text-small    { font-size: 0.75rem; }
@@ -391,11 +391,12 @@
             <th>User</th>
             <th>Episode</th>
             <th>Version</th>
+            <th>Done</th>
             <th>Saved at</th>
           </tr>
         </thead>
         <tbody id="recent-tbody">
-          <tr><td colspan="4">Loading…</td></tr>
+          <tr><td colspan="5">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -793,9 +794,10 @@ Alex Horne</textarea>
           <td><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(v.user_uid)}" target="_blank" class="link-user">${escHtml(v.user_name || '—')}</a></td>
           <td>${escHtml(v.show || '—')} S${v.season} E${v.episode}</td>
           <td>v${v.version_number}</td>
+          <td>${v.is_complete ? '✓' : ''}</td>
           <td class="text-timestamp">${new Date(v.created_at).toLocaleString()}</td>
         </tr>`
-      ).join('') || '<tr><td colspan="4">No activity in the last 24 hours</td></tr>';
+      ).join('') || '<tr><td colspan="5">No activity in the last 24 hours</td></tr>';
     }
 
     const SORT_COLS = ['name', 'email', 'location', 'episodes_assigned', 'episodes_started', 'wants_more'];
