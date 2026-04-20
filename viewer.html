@@ -1290,6 +1290,7 @@
 
 
         line.addEventListener('click', () => {
+          if (textSpan.contentEditable === 'true') return;
           clearSelected();
           line.classList.add('selected');
           seekTo(start, true);
