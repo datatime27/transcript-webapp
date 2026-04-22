@@ -69,33 +69,40 @@ def valid_id(uid):
     return uid and all(c.isalnum() or c in "-_" for c in uid)
 
 
-def _last_modified_time(filepath):
-    """Return the start time of the last modified=true caption as 'H:MM:SS', or None."""
+def _file_stats(filepath):
+    """Return (latest_modification, percent_modified) for a transcript file."""
     if not filepath:
-        return None
+        return None, None
     try:
         base = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base, filepath), encoding="utf-8") as f:
             data = json.load(f)
+        captions = data.get("captions", [])
+        total = len(captions)
         last = None
-        for c in data.get("captions", []):
+        modified_count = 0
+        for c in captions:
             if c.get("modified"):
                 last = c
+                modified_count += 1
         if last is None:
-            return None
-        secs = float(str(last["start"]).strip().rstrip("s"))
-        h = int(secs // 3600)
-        m = int((secs % 3600) // 60)
-        s = int(secs % 60)
-        return f"{h}:{m:02d}:{s:02d}"
+            latest_mod = None
+        else:
+            secs = float(str(last["start"]).strip().rstrip("s"))
+            h = int(secs // 3600)
+            m = int((secs % 3600) // 60)
+            s = int(secs % 60)
+            latest_mod = f"{h}:{m:02d}:{s:02d}"
+        pct = round(100 * modified_count / total) if total else None
+        return latest_mod, pct
     except Exception:
-        return None
+        return None, None
 
 
 def action_load_data():
     latency = get_user_latency()
     for row in latency[:10]:
-        row["latest_modification"] = _last_modified_time(row.get("latest_filepath"))
+        row["latest_modification"], row["percent_modified"] = _file_stats(row.get("latest_filepath"))
     return "200 OK", json.dumps({
         "users":                       get_all_users(),
         "episodes":                    get_all_episodes(),

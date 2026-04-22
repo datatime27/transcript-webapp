@@ -469,7 +469,7 @@
     <h2>User Latency</h2>
     <div class="users-table-wrap">
       <table class="users-table" id="latency-table">
-        <thead><tr><th>User</th><th>Episode</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th></tr></thead>
+        <thead><tr><th>User</th><th>Episode</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th><th>Percent Modified</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -595,7 +595,7 @@ Alex Horne</textarea>
       const tbody = document.querySelector('#latency-table tbody');
       tbody.innerHTML = '';
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
         return;
       }
       const now = Date.now();
@@ -603,10 +603,11 @@ Alex Horne</textarea>
         const activityDate = r.last_save_at || r.assigned_at;
         const ageDays = activityDate ? Math.floor((now - new Date(activityDate).getTime()) / 86400000) : null;
         const ageStr = ageDays === null ? '—' : ageDays === 0 ? 'today' : ageDays === 1 ? '1 day' : `${ageDays} days`;
-        const ageCss = ageDays === null ? '' : ageDays >= 30 ? 'color:#e74c3c' : ageDays >= 14 ? 'color:#e67e22' : '';
+        const ageCss = ageDays === null ? '' : ageDays >= 14 ? 'color:#ff0000' : ageDays >= 7 ? 'color:#ffff00' : '';
         const activityStr = activityDate ? new Date(activityDate).toLocaleDateString() : '—';
         const statusStr = r.version_count === 0 ? '<span style="color:#888;font-style:italic">Not started</span>' : `v${r.version_count}`;
         const modStr = r.latest_modification != null ? r.latest_modification : '<span style="color:#555">—</span>';
+        const pctStr = r.percent_modified != null ? `${r.percent_modified}%` : '<span style="color:#555">—</span>';
         const link = `viewer.html?user=${r.user_uid}&episode=${r.episode_uid}`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -615,7 +616,8 @@ Alex Horne</textarea>
           <td style="white-space:nowrap">${activityStr}</td>
           <td style="white-space:nowrap;${ageCss}">${ageStr}</td>
           <td>${statusStr}</td>
-          <td style="white-space:nowrap">${modStr}</td>`;
+          <td style="white-space:nowrap">${modStr}</td>
+          <td style="white-space:nowrap">${pctStr}</td>`;
         tbody.appendChild(tr);
       });
     }
