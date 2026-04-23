@@ -55,21 +55,23 @@ def get_admin_email():
     return _get_mail_config()["user"]
 
 
-def send_email(to, subject, body):
+def send_email(to, subject, body, bcc_owner=False):
     """Send a plain-text + HTML multipart email.
 
     Args:
-        to      : recipient address (string)
-        subject : email subject line
-        body    : plain-text body (simple markdown supported)
+        to        : recipient address (string)
+        subject   : email subject line
+        body      : plain-text body (simple markdown supported)
+        bcc_owner : if True, Bccs the sending account from db.ini
     """
     c = _get_mail_config()
 
     msg = MIMEMultipart("alternative")
     msg["From"]    = f"{c['name']} <{c['user']}>"
     msg["To"]      = to
-    msg["Bcc"]     = c["user"]
     msg["Subject"] = subject
+    if bcc_owner:
+        msg["Bcc"] = c["user"]
 
     msg.attach(MIMEText(body, "plain"))
     msg.attach(MIMEText(_markdown_to_html(body), "html"))

@@ -248,16 +248,18 @@ def action_add_episode_to_user(data):
             if episode_count == 1:
                 viewer_url = base_url
                 send_email(
-                    to      = user["email"],
-                    subject = "Taskmaster Transcription Volunteering",
-                    body    = _WELCOME_BODY.format(name=user["name"], link=viewer_url),
+                    to        = user["email"],
+                    subject   = "Taskmaster Transcription Volunteering",
+                    body      = _WELCOME_BODY.format(name=user["name"], link=viewer_url),
+                    bcc_owner = True,
                 )
             else:
                 viewer_url = f"{base_url}&episode={episode_uid}"
                 send_email(
-                    to      = user["email"],
-                    subject = f"Your new episode is ready: {label}",
-                    body    = f"Hi {user['name']}!\n\nYour new episode is ready: **{label}**\n\n{viewer_url}",
+                    to        = user["email"],
+                    subject   = f"Your new episode is ready: {label}",
+                    body      = f"Hi {user['name']}!\n\nYour new episode is ready: **{label}**\n\n{viewer_url}",
+                    bcc_owner = False,
                 )
         return "200 OK", json.dumps({"ok": True})
     except Exception as e:
