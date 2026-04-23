@@ -168,13 +168,17 @@ def action_scan_transcripts():
                 if m:
                     show_name, season_number, episode_number = "Taskmaster AU", int(m.group(1)), int(m.group(2))
                 else:
-                    m = re.search(r"Taskmaster(?:\s+UK)?[:\s]+Season\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
+                    m = re.search(r"Taskmaster\s+(?:NZ|New\s+Zealand).*?(?:Season|Series)\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
                     if m:
-                        show_name, season_number, episode_number = "Taskmaster UK", int(m.group(1)), int(m.group(2))
+                        show_name, season_number, episode_number = "Taskmaster NZ", int(m.group(1)), int(m.group(2))
                     else:
-                        m = re.search(r"Series\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
+                        m = re.search(r"Taskmaster(?:\s+UK)?[:\s]+Season\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
                         if m:
                             show_name, season_number, episode_number = "Taskmaster UK", int(m.group(1)), int(m.group(2))
+                        else:
+                            m = re.search(r"Series\s+(\d+).*?Episode\s+(\d+)", title, re.IGNORECASE)
+                            if m:
+                                show_name, season_number, episode_number = "Taskmaster UK", int(m.group(1)), int(m.group(2))
             except Exception:
                 pass
             results.append({
