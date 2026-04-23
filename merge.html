@@ -577,14 +577,14 @@
       headerRow.innerHTML =
         '<th class="col-time">Time</th>' +
         '<th class="col-text">Text</th>' +
+        '<th class="col-result">Result</th>' +
         versions.map((v, vi) => {
           const href     = `viewer.html?user=${encodeURIComponent(v.user_uid)}&episode=${encodeURIComponent(episodeData.episode_uid)}`;
           const disabled = disabledVersions.has(vi) ? ' col-disabled' : '';
           const btnLabel = disabledVersions.has(vi) ? 'off' : 'on';
           const btnTitle = disabledVersions.has(vi) ? 'Re-enable column' : 'Exclude from diff';
           return `<th class="col-user${disabled}"><a href="${escHtml(href)}" target="_blank" style="color:inherit;text-decoration:none;" title="Open in viewer">${escHtml(v.user_name)}</a><span class="btn-toggle-col" onclick="toggleVersion(${vi})" title="${btnTitle}">${btnLabel}</span></th>`;
-        }).join('') +
-        '<th class="col-result">Result</th>';
+        }).join('');
       thead.appendChild(headerRow);
 
       // Body rows
@@ -617,7 +617,7 @@
       const time    = escHtml(seconds.toFixed(2) + 's');
       const text    = escHtml(baseCap.text || '');
       const textClass = unified.textConflict ? 'col-text text-conflict' : 'col-text';
-      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="${textClass}">${text}</td>`;
+      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="${textClass}">${text}</td><td class="col-result">${resultCell(i)}</td>`;
 
       unified.perVersion.forEach((cap, vi) => {
         const isDisabled = disabledVersions.has(vi);
@@ -638,7 +638,6 @@
         }
       });
 
-      cells += `<td class="col-result">${resultCell(i)}</td>`;
       tr.innerHTML = cells;
       return tr;
     }
@@ -666,8 +665,7 @@
         cell.classList.toggle('selected', isSelected);
       });
 
-      const tds = tr.querySelectorAll('td');
-      tds[tds.length - 1].innerHTML = resultCell(i);
+      tr.querySelector('td.col-result').innerHTML = resultCell(i);
     }
 
     function updateProgress() {
