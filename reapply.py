@@ -2,8 +2,9 @@
 """
 CGI script — reapply annotations tool (admin only).
 
-  GET /reapply.py?user={admin_uid}&version={version_uid}
+  GET /reapply.py?user={admin_uid}&version={version_uid}&altered_cc=0|1&compare_text=0|1
     → runs apply_annotations(user_version, new_base)
+    → altered_cc=0: changed captions keep the user's original speaker instead of ALTERED_CC
     → returns { episode_title, user_name, youtube_id,
                 total, matched, altered_cc,
                 user_captions:   [{text, start, speaker}, ...]
@@ -39,6 +40,7 @@ try:
     user_uid       = params.get("user",         [""])[0]
     version_uid    = params.get("version",      [""])[0]
     compare_text   = params.get("compare_text", ["0"])[0] == "1"
+    use_altered_cc = params.get("altered_cc",   ["1"])[0] == "1"
     if not valid_id(user_uid) or not is_admin(user_uid):
         status = "403 Forbidden"
         body   = json.dumps({"error": "Admin access required"})
@@ -66,6 +68,14 @@ try:
             result          = apply_annotations(copy.deepcopy(user_version), new_base, compare_text=compare_text)
             result_captions = result['captions']
             user_captions   = user_version['captions']
+
+            if not use_altered_cc:
+                base_start_to_speaker = {to_float(c['start']): c.get('speaker') for c in new_base['captions']}
+                for c in result_captions:
+                    if c.get('speaker') == 'ALTERED_CC':
+                        orig = base_start_to_speaker.get(to_float(c['start']))
+                        if orig:
+                            c['speaker'] = orig
 
             # Map each result caption back to its user caption index (by start time).
             # ALTERED_CC captions get null — they render as result-only rows, while

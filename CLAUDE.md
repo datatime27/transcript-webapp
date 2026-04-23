@@ -82,7 +82,7 @@ Public sign-up page at `signup.html`. Fields: Email (required), Name (required),
 
 Admin-only tool at `reapply.html?user={admin_uid}&version={version_uid}`. Shows a side-by-side diff of a user's annotated version vs. the result of running `apply_annotations()` against the current base transcript. Left panel: YouTube player. Right panel: diff table.
 
-**reapply.py GET**: `?user={admin_uid}&version={version_uid}&altered_cc=0|1&compare_text=0|1` — loads original and user version files, runs `apply_annotations(compare_text=...)`, aligns result captions to user captions by start time, returns `{episode_title, user_name, youtube_id, user_uid, episode_uid, speakers, total, matched, altered_cc, removed, user_captions, result_captions, row_matches}`. `speakers` is the season speaker list (used to populate dropdowns). `row_matches` is a list parallel to `result_captions`: each entry is the index into `user_captions` for matched rows, or `null` for ALTERED_CC rows. `altered_cc=0` uses nearest-annotation speaker instead of ALTERED_CC for unmatched captions.
+**reapply.py GET**: `?user={admin_uid}&version={version_uid}&altered_cc=0|1&compare_text=0|1` — loads original and user version files, runs `apply_annotations(compare_text=...)`, aligns result captions to user captions by start time, returns `{episode_title, user_name, youtube_id, user_uid, episode_uid, speakers, total, matched, altered_cc, removed, user_captions, result_captions, row_matches}`. `speakers` is the season speaker list (used to populate dropdowns). `row_matches` is a list parallel to `result_captions`: each entry is the index into `user_captions` for matched rows, or `null` for ALTERED_CC rows. `altered_cc=0` uses the speaker from the original base caption instead of ALTERED_CC.
 
 **Diff table columns**: Time | User text | User speaker | Result text | Result speaker | × (remove).
 
@@ -94,7 +94,7 @@ Admin-only tool at `reapply.html?user={admin_uid}&version={version_uid}`. Shows 
 
 **Summary**: shows matched / ALTERED_CC / removed / total counts. ALTERED_CC count updates live as dropdowns change or rows are removed.
 
-**Header controls**: ↑↓ Prev/Next ALTERED_CC (navigates `alteredIndices`), Show matched checkbox, Use ALTERED_CC checkbox (triggers reload), Compare text checkbox (triggers reload — passes `compare_text=1` to reapply.py, flags text-changed captions as ALTERED_CC in addition to duration-changed ones).
+**Header controls**: ↑↓ Prev/Next ALTERED_CC (navigates `alteredIndices`), Show matched checkbox, Use ALTERED_CC checkbox (triggers reload — when unchecked, changed/inserted captions use the speaker from the base caption instead of ALTERED_CC), Compare text checkbox (triggers reload — passes `compare_text=1` to reapply.py, flags text-changed captions as ALTERED_CC in addition to duration-changed ones).
 
 **Save**: collects dropdown speaker selections into `result_captions`, filters deleted indices, POSTs to `transcripts.py` as a new version for the original user.
 
