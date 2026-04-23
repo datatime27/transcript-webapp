@@ -215,7 +215,6 @@
 
     .col-time {
       white-space: nowrap;
-      color: #999;
       font-size: 0.8rem;
       width: 58px;
     }
@@ -716,6 +715,12 @@
       else if (next >= conflictIndices.length) setActiveConflict(0);
       else setActiveConflict(next);
     }
+
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); jumpToConflict(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); jumpToConflict(-1); }
+    });
 
     // ── Save ────────────────────────────────────────────────────────────────
 
