@@ -1074,7 +1074,7 @@
     const oldSpeakers = [...new Set(indices.map(i => captions[i].speaker))];
 
     indices.forEach(i => {
-      const wasAutoAssigned = captions[i].speaker.startsWith('SPEAKER_');
+      const wasAutoAssigned = (captions[i].speaker || '').startsWith('SPEAKER_');
       captions[i].speaker = newSpeaker;
       if (!wasAutoAssigned) captions[i].modified = true;
     });
