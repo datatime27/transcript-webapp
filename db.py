@@ -140,7 +140,7 @@ def get_episodes_with_user_versions():
                       s.name, season.number, e.number, u.is_admin, u.is_test_account,
                       (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid),
                       season.is_complete, ue.is_complete, u.is_anonymous,
-                      MAX(v.created_at), ue.created_at
+                      MAX(v.created_at), ue.created_at, season.uid
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -162,6 +162,7 @@ def get_episodes_with_user_versions():
                     "episode_number":  row[9],
                     "has_merged":      bool(row[12]),
                     "season_complete": bool(row[13]),
+                    "season_uid":      row[18],
                     "users":           [],
                 }
             if row[3] is not None:
@@ -670,6 +671,22 @@ def get_all_seasons():
             {"uid": row[0], "show_name": row[1], "season_number": row[2]}
             for row in cur.fetchall()
         ]
+    finally:
+        conn.close()
+
+
+def set_season_complete(season_uid, is_complete):
+    """Set or clear the is_complete flag on a season."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE seasons SET is_complete = %s WHERE uid = %s",
+            (1 if is_complete else None, season_uid),
+        )
+        if cur.rowcount == 0:
+            raise ValueError(f"Season not found: {season_uid!r}")
+        conn.commit()
     finally:
         conn.close()
 

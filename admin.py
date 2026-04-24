@@ -30,7 +30,7 @@ from db import (
     get_wants_more_suggestions,
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
     get_user_info, get_episode_info, get_user_episode_count,
-    set_season_speakers, set_location_season, update_user_location,
+    set_season_speakers, set_season_complete, set_location_season, update_user_location,
     get_reapply_data, get_user_latency,
 )
 from annotation_utils import apply_annotations
@@ -270,6 +270,18 @@ def action_add_episode_to_user(data):
         return "500 Internal Server Error", json.dumps({"error": str(e)})
 
 
+def action_set_season_complete(data):
+    season_uid  = str(data.get("season_uid",  "") or "").strip()
+    is_complete = bool(data.get("is_complete", False))
+    if not season_uid:
+        return "400 Bad Request", json.dumps({"error": "season_uid is required"})
+    try:
+        set_season_complete(season_uid, is_complete)
+        return "200 OK", json.dumps({"ok": True})
+    except ValueError as e:
+        return "404 Not Found", json.dumps({"error": str(e)})
+
+
 def action_set_location_season(data):
     location   = str(data.get("location",   "") or "").strip()
     season_uid = str(data.get("season_uid", "") or "").strip()
@@ -319,6 +331,7 @@ POST_ACTIONS = {
     "populate_transcript":    action_populate_transcript,
     "add_episode_to_user":    action_add_episode_to_user,
     "set_season_speakers":    action_set_season_speakers,
+    "set_season_complete":    action_set_season_complete,
     "set_location_season":    action_set_location_season,
     "update_user_location":   action_update_user_location,
 }

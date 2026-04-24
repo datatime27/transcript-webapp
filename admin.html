@@ -756,7 +756,12 @@ Alex Horne</textarea>
         eps.forEach(ep => {
           const seasonKey = `${ep.show_name}|${ep.season_number}`;
           if (seasonKey !== lastSeason) {
-            parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number}</div>`);
+            const isComplete = ep.season_complete;
+            const btnLabel = isComplete ? 'Mark active' : 'Mark complete';
+            const btnStyle = isComplete
+              ? 'background:#1a4d22;color:#9ee8a0;border-color:#276630'
+              : 'background:#4d1a1a;color:#e89e9e;border-color:#663030';
+            parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.7rem;${btnStyle}" onclick="setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div>`);
             lastSeason = seasonKey;
           }
           parts.push(renderEpisodeRow(ep));
@@ -779,6 +784,26 @@ Alex Horne</textarea>
         const seasonCount = new Set(completedEps.map(ep => `${ep.show_name}|${ep.season_number}`)).size;
         document.getElementById('completed-season-count').textContent = seasonCount;
       }
+    }
+
+    async function setSeasonComplete(seasonUid, isComplete, btn) {
+      btn.disabled = true;
+      btn.textContent = '…';
+      const res = await fetch('./admin.py?' + new URLSearchParams({user: userUid}), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'set_season_complete', season_uid: seasonUid, is_complete: isComplete}),
+      });
+      if (!res.ok) {
+        btn.disabled = false;
+        btn.textContent = isComplete ? 'Mark complete' : 'Mark active';
+        alert('Failed to update season.');
+        return;
+      }
+      allEpisodesWithUsers = allEpisodesWithUsers.map(ep =>
+        ep.season_uid === seasonUid ? {...ep, season_complete: isComplete} : ep
+      );
+      renderEpisodesWithUsers(allEpisodesWithUsers);
     }
 
     function toggleCompletedSeasons() {
