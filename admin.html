@@ -402,6 +402,24 @@
     </div>
   </div>
 
+  <!-- Done per day -->
+  <div class="section">
+    <h2>Versions Completed per Day <span class="section-note">(last 7 days)</span></h2>
+    <div class="users-table-wrap">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Done</th>
+          </tr>
+        </thead>
+        <tbody id="done-per-day-tbody">
+          <tr><td colspan="2">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Episodes -->
   <div class="section">
     <h2>Episodes <button id="check-altered-btn" class="btn-small" style="vertical-align:middle;margin-left:8px" onclick="checkAlteredCC(this)">Check ALTERED_CC</button> <label style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle;margin-left:6px;cursor:pointer"><input type="checkbox" id="check-compare-text" style="vertical-align:middle"> Compare text</label> <span id="check-altered-status" style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle"></span></h2>
@@ -583,6 +601,7 @@ Alex Horne</textarea>
       allEpisodesWithUsers = data.episodes_with_user_versions;
       wantsMoreSuggestions = data.wants_more_suggestions || {};
       renderRecentVersions(data.recent_versions);
+      renderDonePerDay(data.recent_versions);
       renderEpisodesWithUsers(data.episodes_with_user_versions);
       populateSeasonSelect(data.episodes_with_user_versions);
       renderUsers(data.users);
@@ -825,6 +844,21 @@ Alex Horne</textarea>
           <td class="text-timestamp">${new Date(v.created_at).toLocaleString()}</td>
         </tr>`
       ).join('') || '<tr><td colspan="5">No activity in the last 24 hours</td></tr>';
+    }
+
+    function renderDonePerDay(versions) {
+      const counts = {};
+      for (const v of versions) {
+        if (!v.is_complete) continue;
+        const day = new Date(v.created_at).toLocaleDateString();
+        counts[day] = (counts[day] || 0) + 1;
+      }
+      const rows = Object.entries(counts).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+      const tbody = document.getElementById('done-per-day-tbody');
+      tbody.innerHTML = rows.map(([day, count]) => {
+        const dow = new Date(day).toLocaleDateString(undefined, {weekday: 'long'});
+        return `<tr><td>${escHtml(day)} ${escHtml(dow)}</td><td>${count}</td></tr>`;
+      }).join('') || '<tr><td colspan="2">No completions in the last 7 days</td></tr>';
     }
 
     const SORT_COLS = ['name', 'email', 'location', 'episodes_assigned', 'episodes_started', 'wants_more'];
