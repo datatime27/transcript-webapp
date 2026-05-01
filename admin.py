@@ -25,7 +25,7 @@ from pathlib import Path
 
 from urllib.parse import parse_qs
 from db import (
-    is_admin, get_all_users, get_all_episodes, get_recent_versions,
+    is_admin, get_active_users, get_all_episodes, get_recent_versions,
     get_episodes_with_user_versions, get_all_locations, get_all_seasons,
     get_wants_more_suggestions,
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
@@ -104,7 +104,7 @@ def action_load_data():
     for row in latency[:10]:
         row["latest_modification"], row["percent_modified"] = _file_stats(row.get("latest_filepath"))
     return "200 OK", json.dumps({
-        "users":                       get_all_users(),
+        "users":                       get_active_users(),
         "episodes":                    get_all_episodes(),
         "recent_versions":             get_recent_versions(),
         "episodes_with_user_versions": get_episodes_with_user_versions(),

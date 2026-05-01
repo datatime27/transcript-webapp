@@ -273,8 +273,8 @@ def get_user_info(user_uid):
         conn.close()
 
 
-def get_all_users():
-    """Return all users ordered by name."""
+def get_active_users():
+    """Return active users ordered by name."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
@@ -288,6 +288,7 @@ def get_all_users():
             FROM users u
             LEFT JOIN user_episodes ue ON ue.user_uid = u.uid
             LEFT JOIN versions v ON v.user_uid = u.uid
+            WHERE u.active = 1
             GROUP BY u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location, u.wants_more, u.active, u.created_at
             ORDER BY u.name
             """,
