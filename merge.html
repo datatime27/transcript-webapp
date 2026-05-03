@@ -224,8 +224,7 @@
       white-space: normal;
       word-break: break-word;
     }
-    .col-text.text-conflict,
-    .text-snippet {
+    .col-text.text-conflict {
       color: #ff0000;
       vertical-align: bottom;
       font-weight: 600;
@@ -236,12 +235,35 @@
     .text-snippet {
       display: block;
       margin-top: 2px;
+      white-space: normal;
+      word-break: break-word;
+      vertical-align: bottom;
+    }
+
+    .text-snippet.text-match {
+      color: #ff0000;
+      font-weight: 600;
     }
 
     .col-result {
       white-space: nowrap;
+      min-width: 120px;
+    }
+
+    .result-select {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 2px 4px;
+      font-size: inherit;
+      font-weight: normal;
+      width: 100%;
+    }
+
+    .result-select.unresolved {
+      color: #ff0000;
       font-weight: 600;
-      min-width: 100px;
     }
 
     /* Agreed rows */
@@ -481,37 +503,34 @@
       return winners.length === 1 ? present.find(c => keyFn(c) === winners[0]) : null;
     }
 
+    function resolveSelection(present, textConflict) {
+      // Single modifier wins over majority
+      const modifiers = present.filter(c => c.modified);
+      if (modifiers.length === 1) {
+        const m = modifiers[0];
+        return textConflict
+          ? { speaker: m.speaker, text: m.text || '', modified: true }
+          : { speaker: m.speaker, modified: true };
+      }
+
+      if (textConflict) {
+        const winning = majorityVote(present, c => `${c.text || ''}|||${c.speaker}`);
+        return winning ? { speaker: winning.speaker, text: winning.text, modified: winning.modified } : null;
+      } else {
+        const speakers = present.map(c => c.speaker);
+        if (speakers.every(s => s === speakers[0]))
+          return { speaker: speakers[0], modified: present[0].modified };
+        const winning = majorityVote(present, c => c.speaker);
+        return winning ? { speaker: winning.speaker, modified: winning.modified } : null;
+      }
+    }
+
     function initSelections() {
       selections = [];
-
       for (const row of unifiedCaptions) {
         const present = row.perVersion.filter((c, vi) => c !== null && !disabledVersions.has(vi));
         if (present.length === 0) { selections.push(null); continue; }
-
-        if (row.textConflict) {
-          // Vote on (text, speaker) pair; tie → null
-          const winning = majorityVote(present, c => `${c.text || ''}|||${c.speaker}`);
-          if (winning) {
-            selections.push({ speaker: winning.speaker, text: winning.text, modified: winning.modified });
-          } else {
-            selections.push(null);
-          }
-        } else {
-          const speakers = present.map(c => c.speaker);
-          const allSame  = speakers.every(s => s === speakers[0]);
-
-          if (allSame) {
-            selections.push({ speaker: speakers[0], modified: present[0].modified });
-          } else {
-            // Majority vote among present versions; tie → null (unresolved)
-            const winning = majorityVote(present, c => c.speaker);
-            if (winning) {
-              selections.push({ speaker: winning.speaker, modified: winning.modified });
-            } else {
-              selections.push(null);
-            }
-          }
-        }
+        selections.push(resolveSelection(present, row.textConflict) || { speaker: '?', modified: false });
       }
     }
 
@@ -544,7 +563,9 @@
             c.speaker === selections[i].speaker &&
             (!row.textConflict || (c.text || '') === (selections[i].text || ''))
           );
-          if (!stillValid) selections[i] = null;
+          if (!stillValid) selections[i] = resolveSelection(present, row.textConflict) || { speaker: '?', modified: false };
+        } else {
+          selections[i] = resolveSelection(present, row.textConflict) || { speaker: '?', modified: false };
         }
       });
 
@@ -614,8 +635,8 @@
       tr.className = agreed ? ('row-agreed' + (showAgreed ? ' show-agreed' : '')) : 'row-disagreed';
 
       const seconds = parseFloat(String(baseCap.start || '').trim().replace('s', ''));
-      const time    = escHtml(seconds.toFixed(2) + 's');
-      const text    = escHtml(baseCap.text || '');
+      const time    = Math.floor(seconds / 60).toString().padStart(2, '0') + ':' + Math.floor(seconds % 60).toString().padStart(2, '0');
+      const text    = unified.textConflict ? escHtml(getResultText(i)) : escHtml(baseCap.text || '');
       const textClass = unified.textConflict ? 'col-text text-conflict' : 'col-text';
       let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="${textClass}">${text}</td><td class="col-result">${resultCell(i)}</td>`;
 
@@ -624,15 +645,17 @@
         if (cap === null) {
           cells += `<td data-vi="${vi}"><span class="speaker-cell missing">—</span></td>`;
         } else {
-          const mBadge     = cap.modified ? '<span class="badge-m">M</span>' : '';
-          const isSelected = !isDisabled && !agreed && selections[i] &&
+          const mBadge      = cap.modified ? '<span class="badge-m">M</span>' : '';
+          const isSelected  = !isDisabled && !agreed && selections[i] &&
             selections[i].speaker === cap.speaker &&
             (!unified.textConflict || selections[i].text === (cap.text || ''));
-          const selected   = isSelected ? ' selected' : '';
-          const clickAttr  = (agreed || isDisabled) ? '' : ` onclick="selectCell(${i}, ${vi})"`;
-          const dimAttr    = isDisabled ? ' style="opacity:0.3"' : '';
-          const snippet    = unified.textConflict
-            ? `<span class="text-snippet">${escHtml(cap.text || '')}</span>`
+          const isTextMatch = unified.textConflict && selections[i] &&
+            (cap.text || '') === (selections[i].text || '');
+          const selected    = isSelected ? ' selected' : '';
+          const clickAttr   = (agreed || isDisabled) ? '' : ` onclick="selectCell(${i}, ${vi})"`;
+          const dimAttr     = isDisabled ? ' style="opacity:0.3"' : '';
+          const snippet     = unified.textConflict
+            ? `<span class="text-snippet${isTextMatch ? ' text-match' : ''}">${escHtml(cap.text || '')}</span>`
             : '';
           cells += `<td data-vi="${vi}"${dimAttr}><span class="speaker-cell${selected}"${clickAttr}>${escHtml(cap.speaker)}${mBadge}</span>${snippet}</td>`;
         }
@@ -642,11 +665,38 @@
       return tr;
     }
 
-    function resultCell(i) {
+    function getResultText(i) {
       const sel = selections[i];
-      if (!sel) return '<span class="result-unresolved">?</span>';
-      const mBadge = sel.modified ? ' <span class="badge-m">M</span>' : '';
-      return `<span class="result-resolved">${escHtml(sel.speaker)}${mBadge}</span>`;
+      if (sel && sel.text != null) return sel.text;
+      const base = unifiedCaptions[i].perVersion.find(c => c !== null);
+      return base ? (base.text || '') : '';
+    }
+
+    function resultCell(i) {
+      const speakers = [...((episodeData && episodeData.speakers) || []), 'Other', 'MULTIPLE'];
+      const current  = selections[i] ? selections[i].speaker : '';
+      const unresolved = current === '?';
+      if (unresolved) speakers.push('?');
+      const opts = speakers.map(sp => {
+        const selected = sp === current ? ' selected' : '';
+        const style    = sp === '?' ? ' style="color:#ff0000;font-weight:600;"' : ' style="color:#e0e0e0;font-weight:normal;"';
+        return `<option value="${escHtml(sp)}"${selected}${style}>${escHtml(sp)}</option>`;
+      }).join('');
+      const cls = unresolved ? 'result-select unresolved' : 'result-select';
+      return `<select class="${cls}" onchange="setResultSpeaker(${i}, this.value)">${opts}</select>`;
+    }
+
+    function setResultSpeaker(i, speaker) {
+      const row = unifiedCaptions[i];
+      if (selections[i]) {
+        selections[i].speaker = speaker;
+      } else {
+        selections[i] = row.textConflict
+          ? { speaker, text: getResultText(i), modified: false }
+          : { speaker, modified: false };
+      }
+      refreshRow(i);
+      updateProgress();
     }
 
     function refreshRow(i) {
@@ -654,6 +704,12 @@
       if (!tr) return;
 
       const unified = unifiedCaptions[i];
+
+      if (unified.textConflict) {
+        const textTd = tr.querySelector('td.col-text');
+        if (textTd) textTd.textContent = getResultText(i);
+      }
+
       unified.perVersion.forEach((cap, vi) => {
         if (disabledVersions.has(vi)) return;
         const td   = tr.querySelector(`td[data-vi="${vi}"]`);
@@ -663,6 +719,11 @@
           selections[i].speaker === cap.speaker &&
           (!unified.textConflict || selections[i].text === (cap.text || ''));
         cell.classList.toggle('selected', isSelected);
+        if (unified.textConflict) {
+          const snippet     = td.querySelector('.text-snippet');
+          const isTextMatch = selections[i] && (cap.text || '') === (selections[i].text || '');
+          if (snippet) snippet.classList.toggle('text-match', isTextMatch);
+        }
       });
 
       tr.querySelector('td.col-result').innerHTML = resultCell(i);
@@ -670,7 +731,7 @@
 
     function updateProgress() {
       const total      = conflictIndices.length;
-      const unresolved = conflictIndices.filter(i => selections[i] === null).length;
+      const unresolved = conflictIndices.filter(i => !selections[i] || selections[i].speaker === '?').length;
       const resolved   = total - unresolved;
       const el         = document.getElementById('progress');
 

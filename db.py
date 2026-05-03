@@ -482,9 +482,10 @@ def get_mergeable_episodes():
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
                WHERE (
-                 SELECT COUNT(DISTINCT user_uid)
-                 FROM versions
-                 WHERE episode_uid = e.uid AND user_uid IS NOT NULL
+                 SELECT COUNT(DISTINCT v.user_uid)
+                 FROM versions v
+                 JOIN user_episodes ue ON ue.episode_uid = v.episode_uid AND ue.user_uid = v.user_uid
+                 WHERE v.episode_uid = e.uid AND v.user_uid IS NOT NULL AND ue.is_complete = 1
                ) >= 2
                ORDER BY s.name, season.number, e.number""",
         )
@@ -507,10 +508,11 @@ def get_user_versions_for_episode(episode_uid):
                FROM versions v
                JOIN users u ON u.uid = v.user_uid
                JOIN (
-                 SELECT user_uid, MAX(version_number) AS max_ver
-                 FROM versions
-                 WHERE episode_uid = %s AND user_uid IS NOT NULL
-                 GROUP BY user_uid
+                 SELECT v2.user_uid, MAX(v2.version_number) AS max_ver
+                 FROM versions v2
+                 JOIN user_episodes ue ON ue.episode_uid = v2.episode_uid AND ue.user_uid = v2.user_uid
+                 WHERE v2.episode_uid = %s AND v2.user_uid IS NOT NULL AND ue.is_complete = 1
+                 GROUP BY v2.user_uid
                ) latest ON latest.user_uid = v.user_uid AND latest.max_ver = v.version_number
                WHERE v.episode_uid = %s
                ORDER BY u.name""",
