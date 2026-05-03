@@ -8,7 +8,7 @@ Deploy to a CGI-capable web server. `transcripts.py`, `merge.py`, `admin.py`, `r
 
 ## Architecture
 
-Single-file frontends (`viewer.html`, `merge.html`, `admin.html`, `reapply.html`, `signup.html`, `dashboard.html`) — all HTML, CSS, and JS inline. Python CGI backends (`transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`, `dashboard.py`). MySQL database via `db.py`. Email via `mail.py`.
+Single-file frontends (`viewer.html`, `viewer-beta.html`, `merge.html`, `admin.html`, `reapply.html`, `signup.html`, `dashboard.html`) — all HTML, CSS, and JS inline. Python CGI backends (`transcripts.py`, `merge.py`, `admin.py`, `reapply.py`, `signup.py`, `dashboard.py`). MySQL database via `db.py`. Email via `mail.py`.
 
 **viewer.html flow:**
 1. On load, fetches `./transcripts.py?user={uid}` → `{name, episodes: [{version_id, title, version, episode_uid, is_complete}]}`. Returns 404 `{"error": "User not found"}` if uid is unknown — viewer shows a message with a link to `signup.html` and no buttons. Displays username on load screen. Populates load-screen dropdown and in-app episode switcher.
@@ -133,6 +133,18 @@ Title parsing in `scan_transcripts`: "Taskmaster Australia Series/Season N, Epis
 
 The `ae-episode` select uses `<optgroup>` elements to group episodes by show+season; option values are `episode.uid`.
 
+## viewer-beta.html
+
+Beta version of the viewer at `viewer-beta.html?user={uid}`. Shares the same backend as `viewer.html` — same URL params, same `transcripts.py` API — but adds transcript structure editing. Saves include `app_version: '2.0'` in the POST payload, stored in `versions.app_version`.
+
+**Additional caption editing controls** (always visible, per caption line):
+- **× (delete)** — removes the caption from the array.
+- **+ (insert)** — inserts a new blank caption below; start time is midpoint between surrounding captions (or `prev_start + prev_duration` at the end); duration spans to the next caption; speaker copied from the caption above; new caption auto-focuses for immediate text entry.
+- **✂ (split)** — visible only while a caption is in text edit mode (double-click to enter). Click ✂ to split at the current cursor position; text is divided at that character offset, duration split proportionally, right half gets a fresh `start = left_start + left_duration`.
+- **Timecode editing** — double-click the timecode to edit it inline. Accepts `MM:SS`, `H:MM:SS`, or bare seconds. On commit, the captions array is re-sorted by start time.
+
+**Undo / redo** — `undoStack` and `redoStack` hold deep-copied snapshots of `captions` (max 50 entries). `pushUndo()` is called before every mutation: delete, insert, split, speaker change (`setSpeaker`), text edit commit, start time edit commit. `reRender()` is called by both `undo()` and `redo()` after swapping the snapshot. Stacks cleared on episode load. Keyboard: Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo (ignored when a `contentEditable` element is focused). ↺/↻ buttons in the header mirror the keyboard shortcuts and are disabled when their stack is empty.
+
 ## viewer.html load screen
 
 The load screen has an **Open** button and an **"I'm ready for a new episode"** button. Clicking the latter POSTs `{action: "wants_more", user_uid}` to `transcripts.py`, which validates the user exists (returns 404 if not), sets `wants_more=1`, and emails the admin via `notify_wants_more()`. On success the button is replaced with "You will receive an email when your new episode is ready".
@@ -179,4 +191,4 @@ Boolean-like flags use `TINYINT(1) DEFAULT NULL` (not `BOOLEAN`, not `DEFAULT FA
 - `get_reapply_data(version_uid)` — returns 7-tuple: `(original_filepath, version_filepath, episode_title, user_name, youtube_id, user_uid, episode_uid)`.
 - `get_mergeable_episodes()` — returns `[{episode_uid, title}]` for episodes with ≥2 distinct user versions.
 - `get_user_versions_for_episode(episode_uid)` — returns each user's latest version: `[{user_name, user_uid, version_uid, version_number, filepath}]`; excludes null user (original import).
-- `insert_version(youtube_id, filepath, user_uid, is_merged=None)` — saves a new version; per-user version numbering via `<=>` null-safe comparison; uses derived table subquery to avoid MySQL error 1093.
+- `insert_version(youtube_id, filepath, user_uid, is_merged=None, app_version=None)` — saves a new version; per-user version numbering via `<=>` null-safe comparison; uses derived table subquery to avoid MySQL error 1093. `app_version` stored as-is (e.g. `'2.0'` for saves from `viewer-beta.html`, `NULL` for all others).

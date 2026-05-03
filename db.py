@@ -524,7 +524,7 @@ def get_user_versions_for_episode(episode_uid):
         conn.close()
 
 
-def insert_version(youtube_id, filepath, user_uid, is_merged=None):
+def insert_version(youtube_id, filepath, user_uid, is_merged=None, app_version=None):
     """Insert a version record for the episode with the given YouTube ID."""
     conn = get_db_connection()
     try:
@@ -538,11 +538,11 @@ def insert_version(youtube_id, filepath, user_uid, is_merged=None):
         # The derived table (AS v) is required because MySQL doesn't allow a subquery
         # to reference the same table being modified (error 1093).
         cur.execute(
-            """INSERT INTO versions (uid, episode_uid, version_number, filepath, user_uid, is_merged)
+            """INSERT INTO versions (uid, episode_uid, version_number, filepath, user_uid, is_merged, app_version)
                VALUES (%s, %s,
                  COALESCE((SELECT MAX(v.version_number) FROM (SELECT version_number FROM versions WHERE episode_uid = %s AND user_uid <=> %s) AS v), 0) + 1,
-                 %s, %s, %s)""",
-            (version_uid, episode_uid, episode_uid, user_uid, filepath, user_uid, is_merged),
+                 %s, %s, %s, %s)""",
+            (version_uid, episode_uid, episode_uid, user_uid, filepath, user_uid, is_merged, app_version),
         )
         cur.execute("SELECT version_number FROM versions WHERE uid = %s", (version_uid,))
         new_version = cur.fetchone()[0]

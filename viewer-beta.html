@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcript Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 18px; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #load-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      padding: 64px 16px 32px;
+    }
+
+    #load-screen h1 {
+      font-size: 1.5rem;
+      color: #fff;
+    }
+
+    #load-screen p {
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    #help-panel {
+      margin-top: 8px;
+      max-width: 900px;
+      width: 100%;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      background: #111;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+	
+    .help-section {
+      padding: 8px;
+    }
+
+    .help-section h3 {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #77ffff;
+      margin-bottom: 10px;
+      font-weight: 800;
+    }
+
+    .help-section ul {
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .help-section li {
+      font-size: 1rem;
+      color: #fff;
+      line-height: 1.5;
+    }
+
+    .help-section li strong, .help-key {
+      color: #fff;
+    }
+
+    .help-key {
+      display: inline-block;
+      background: #222;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 0.9rem;
+      font-family: monospace;
+      margin-right: 2px;
+    }
+
+    .help-note {
+      font-size: 0.95rem;
+      color: #aaa;
+      border-top: 1px solid #222;
+      padding-top: 16px;
+      line-height: 1.6;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .load-btn {
+      padding: 12px 28px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .load-btn:hover { background: #cc0000; }
+
+    #wants-more-btn {
+      padding: 12px 28px;
+      background: #2a2a2a;
+      color: #bbb;
+      border: 1px solid #555;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #wants-more-btn:hover { background: #333; color: #e0e0e0; }
+    #wants-more-msg { color: #4caf50; font-size: 0.9rem; margin-top: 8px; }
+    a.cyan-link { color: #00ffff; text-decoration: underline; }
+    a.cyan-link:hover { color: #aaffff; }
+
+    #transcript-select {
+      padding: 10px 14px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      min-width: 320px;
+      cursor: pointer;
+    }
+
+    #app {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #video-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    #episode-select {
+      background: #1a1a1a;
+      color: #ccc;
+      border: 1px solid #333;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      cursor: pointer;
+      min-width: 0;
+    }
+
+    #version-badge {
+      font-size: 0.8rem;
+      color: white;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    #save-btn {
+      background: none;
+      border: 1px solid #555;
+      padding: 4px 14px;
+      border-radius: 5px;
+      font-size: 0.82rem;
+	  color: white;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    #save-btn:hover { border-color: #4caf50; color: #4caf50; }
+    #save-btn:disabled { opacity: 0.4; cursor: default; }
+
+    #done-btn {
+      background: none;
+      border: 1px solid #555;
+      padding: 4px 14px;
+      border-radius: 5px;
+      font-size: 0.82rem;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #done-btn:hover { border-color: #4caf50; color: #4caf50; }
+    #done-btn:disabled { opacity: 0.4; cursor: default; }
+
+    #done-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #done-modal.open { display: flex; }
+    #done-modal-inner {
+      background: #141414;
+      border: 3px solid white;
+      border-radius: 12px;
+      padding: 28px 32px;
+      max-width: 420px;
+      width: 90%;
+    }
+    #done-modal p {
+      font-size: 0.95rem;
+      color: #e0e0e0;
+      margin-bottom: 18px;
+    }
+    #done-modal .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: #ccc;
+      margin-bottom: 22px;
+      cursor: pointer;
+    }
+    #done-modal .modal-btns {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    #done-modal-ok {
+      padding: 7px 20px;
+      background: none;
+      border: 1px solid #4caf50;
+      color: #4caf50;
+      border-radius: 5px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #done-modal-ok:hover { background: rgba(76,175,80,0.15); }
+    #done-modal-cancel {
+      padding: 7px 20px;
+      background: none;
+      border: 1px solid #555;
+      color: #aaa;
+      border-radius: 5px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #done-modal-cancel:hover { border-color: #888; color: #ccc; }
+
+    #settings-btn, #help-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 4px 6px;
+      flex-shrink: 0;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    #settings-btn:hover, #help-btn:hover { color: #aaffff; }
+
+    #help-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #help-modal.open { display: flex; }
+    #help-modal-inner {
+      background: #141414;
+      border: 3px solid white;
+      border-radius: 12px;
+      padding: 28px 32px;
+      max-width: 900px;
+      width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    #help-modal-close {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #help-modal-close:hover { color: #aaffff; }
+
+    #settings-popup {
+      display: none;
+      position: absolute;
+      top: 48px;
+      right: 16px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px 20px;
+      z-index: 100;
+      min-width: 300px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+    #settings-popup h3 {
+      font-size: 0.85rem;
+      color: #aaa;
+      font-weight: 600;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .setting-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .setting-row label {
+      font-size: 0.8rem;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+    }
+    .setting-row label span { color: #ccc; }
+    .setting-row input[type="range"] { width: 100%; accent-color: #4caf50; }
+
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #video-panel {
+      flex: 0 0 62%;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      min-width: 20%;
+      max-width: 80%;
+    }
+
+    #panel-splitter {
+      width: 5px;
+      cursor: col-resize;
+      background: #2a2a2a;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #panel-splitter:hover, #panel-splitter.dragging { background: #555; }
+
+    #player-container {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%; /* 16:9 */
+    }
+
+    #player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #transcript-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #2a2a2a;
+      overflow: hidden;
+    }
+
+    #transcript-header {
+      padding: 10px 16px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    #transcript-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+      scroll-behavior: smooth;
+    }
+
+    #transcript-scroll::-webkit-scrollbar { width: 12px; }
+    #transcript-scroll::-webkit-scrollbar-track { background: #1a1a1a; }
+    #transcript-scroll::-webkit-scrollbar-thumb { background: #555; border-radius: 6px; }
+    #transcript-scroll::-webkit-scrollbar-thumb:hover { background: #777; }
+
+    .speaker-group {
+      margin-bottom: 12px;
+      border: 2px solid #2a2a2a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .speaker-group-header {
+      padding: 10px 16px 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      border-bottom: 2px solid #2a2a2a;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .speaker-group-header:hover { opacity: 0.8; }
+    .speaker-group:first-child { margin-top: 4px; }
+
+    .caption-line {
+      display: flex;
+      gap: 10px;
+      padding: 6px 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 0 6px;
+      transition: background 0.1s;
+      align-items: baseline;
+    }
+
+    .caption-line:hover { background: #1e1e1e; }
+
+    .caption-line.active {
+      background: #2a1a1a;
+      border-left: 3px solid #e53935;
+      padding-left: 13px;
+    }
+
+    .caption-time {
+      font-size: 0.8rem;
+      color: #999;
+      min-width: 46px;
+      padding-top: 2px;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .caption-line.active .caption-time { color: #4caf50; }
+
+    .caption-speaker {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .caption-text {
+      font-size: 0.9rem;
+      line-height: 1.45;
+      color: #bbb;
+      flex: 1;
+    }
+
+    .caption-text[contenteditable="true"] {
+      outline: 1px solid #64b5f6;
+      border-radius: 2px;
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 2px;
+      white-space: pre-wrap;
+      cursor: text;
+    }
+
+    .caption-line.active .caption-text { color: #fff; }
+
+    .caption-line.selected {
+      background: #1a1e2a;
+      border-left: 3px solid #64b5f6;
+      padding-left: 13px;
+    }
+
+    .caption-line.selected .caption-time { color: #64b5f6; }
+    .caption-line.selected .caption-text { color: #fff; }
+
+    .caption-line.modified { background: #141a14; border-right: 3px solid #4caf50; }
+
+    .speaker-dropdown {
+      position: fixed;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      min-width: 160px;
+    }
+
+    .speaker-dropdown-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #ccc;
+      white-space: nowrap;
+    }
+
+    .speaker-dropdown-item:hover { background: #2a2a2a; }
+    .speaker-dropdown-item.current { font-weight: 700; }
+
+    .speaker-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: none;
+      border: none;
+      padding: 3px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .speaker-btn:hover { background: rgba(255,255,255,0.08); }
+
+    .speaker-btn .chevron {
+      font-size: 1.1rem;
+      opacity: 0.6;
+      line-height: 1;
+    }
+
+    .speaker-btn:hover .chevron { opacity: 1; }
+
+    .speaker-group-header {
+      display: flex;
+      align-items: center;
+    }
+
+    @keyframes toast-in {
+      from { transform: translateY(16px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    #apply-all-toast {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 12px 16px;
+      z-index: 2000;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      animation: toast-in 0.2s ease;
+      max-width: 800px;
+    }
+
+    #apply-all-toast.visible { display: flex; align-items: center; gap: 12px; }
+
+    #apply-all-msg {
+      font-size: 0.85rem;
+      color: #aaa;
+      flex: 1;
+      line-height: 1.4;
+    }
+
+    #apply-all-msg code {
+      background: #2e2e2e;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #a5d6a7;
+    }
+
+    .bar-btn {
+      background: none;
+      border: 1px solid #4caf50;
+      color: #4caf50;
+      padding: 7px 18px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .bar-btn:hover { background: rgba(76,175,80,0.15); }
+
+    .bar-btn.dismiss {
+      border-color: #444;
+      color: #888;
+    }
+
+    .bar-btn.dismiss:hover { border-color: #666; color: #bbb; background: none; }
+
+    /* Speaker colours — cycle through these; values set via CSS custom properties in JS */
+    .speaker-0 { color: var(--sp-color-0); }
+    .speaker-1 { color: var(--sp-color-1); }
+    .speaker-2 { color: var(--sp-color-2); }
+    .speaker-3 { color: var(--sp-color-3); }
+    .speaker-4 { color: var(--sp-color-4); }
+    .speaker-5 { color: var(--sp-color-5); }
+    .speaker-6 { color: var(--sp-color-6); }
+    .speaker-7 { color: var(--sp-color-7); }
+    .speaker-8 { color: var(--sp-color-8); }
+    .speaker-unknown  { color: #888; font-style: italic; }
+    .speaker-multiple { color: #888; font-style: italic; }
+
+    .color-picker-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+      font-size: 0.8rem;
+    }
+    .color-picker-row input[type="color"] {
+      width: 26px;
+      height: 20px;
+      border: 1px solid #444;
+      border-radius: 3px;
+      background: none;
+      cursor: pointer;
+      padding: 1px;
+      flex-shrink: 0;
+    }
+    .key-input {
+      width: 22px;
+      height: 20px;
+      text-align: center;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #555;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      cursor: pointer;
+      caret-color: transparent;
+    }
+    .key-input:focus { border-color: #aaa; outline: none; }
+    .reset-btn {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      background: none;
+      border: 1px solid #555;
+      border-radius: 4px;
+      color: #888;
+      cursor: pointer;
+    }
+    .reset-btn:hover { border-color: #aaa; color: #ccc; }
+
+    #undo-btn, #redo-btn {
+      background: none;
+      border: 1px solid #555;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 1rem;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s;
+      line-height: 1;
+    }
+    #undo-btn:hover:not(:disabled), #redo-btn:hover:not(:disabled) { border-color: #aaa; color: #fff; }
+    #undo-btn:disabled, #redo-btn:disabled { opacity: 0.25; cursor: default; }
+
+    /* ── Edit mode ────────────────────────────────────────────────────────────── */
+    .caption-edit-btns {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+      flex-shrink: 0;
+      margin-left: 4px;
+    }
+
+    .caption-delete-btn {
+      background: none;
+      border: none;
+      color: #f44336;
+      font-size: 0.85rem;
+      padding: 2px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s, background 0.15s;
+      line-height: 1;
+    }
+    .caption-delete-btn:hover { opacity: 1; background: rgba(244,67,54,0.15); }
+
+    .caption-split-btn {
+      display: none;
+      background: none;
+      border: 1px solid transparent;
+      color: #64b5f6;
+      font-size: 0.78rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+      line-height: 1;
+    }
+    .caption-split-btn:hover { opacity: 1; background: rgba(100,181,246,0.15); }
+
+    .caption-insert-btn {
+      background: none;
+      border: none;
+      color: #4caf50;
+      font-size: 1rem;
+      padding: 2px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s, background 0.15s;
+      line-height: 1;
+    }
+    .caption-insert-btn:hover { opacity: 1; background: rgba(76,175,80,0.15); }
+
+    .caption-time.editable-time { cursor: pointer; }
+    .caption-time[contenteditable="true"] {
+      outline: 1px solid #f0a500;
+      border-radius: 2px;
+      background: #1a1a10;
+      color: #f0a500;
+      padding: 0 2px;
+      min-width: 50px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="load-screen">
+  <h1>Transcript Viewer</h1>
+  <p id="load-status" style="color:#888;font-size:0.9rem;">Loading transcripts…</p>
+  <select id="transcript-select" style="display:none">
+    <option value="">— choose a transcript —</option>
+  </select>
+  <div id="load-actions" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="load-btn" id="load-btn">Open</button>
+    <button id="wants-more-btn">I'm ready for a new episode</button>
+  </div>
+  <p id="wants-more-msg" style="display:none">You will receive an email when your new episode is ready</p>
+  <p id="load-error" style="color:#f44336;display:none;"></p>
+
+  <div id="help-panel">
+    <div class="help-section">
+      <h3>Intro</h3>
+      <ul>
+        <li>This webpage loads the YouTube episode alongside the transcript. I have produced the transcript using a process that estimates who is speaking. However, in practice, the estimations are only correct some of the time.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Getting started</h3>
+      <ul>
+        <li>The process I used to estimate speakers doesn't know speaker names, so you'll just see <strong>SPEAKER_00</strong>, <strong>SPEAKER_01</strong>, etc.</li>
+        <li>The first time you change a <strong>SPEAKER_</strong> to a real name the tool will ask you if you'd like to apply this to all other instances of that speaker as well.</li>
+        <li>Be warned sometimes the tool gets the speaker wrong (especially during the intro theme), so check that a given speaker seems correct before applying to all of them.</li>
+        <li>In practice I found it's best to start with the prize task. Then each of the 7 speakers gets a turn at speaking, which will give you a better idea of who is who.</li>
+        <li>There is also the <strong>Other</strong> speaker which is for anything that can't be attributed to one of the 7 speakers (e.g. applause, noises, guest speaker).</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Playback</h3>
+      <ul>
+        <li><span class="help-key">Space</span> Play / pause</li>
+        <li><span class="help-key">↑</span> <span class="help-key">↓</span> Previous / next caption (preserves play/pause state)</li>
+        <li><strong>Click caption text or timecode</strong> — seek and play</li>
+        <li><strong>Click speaker button</strong> — seek and pause, open speaker picker</li>
+        <li>The active caption is highlighted in <span style="color:#ff7777;">red</span>.</li>
+        <li>The panel divider between the video and transcript is draggable (20–80% range).</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Assigning speakers</h3>
+      <ul>
+        <li>Click a speaker button on any caption (or group header) to open the speaker picker.</li>
+        <li>For each group of lines from the same speaker there is also a group header — changing it reassigns all lines in that group at once.</li>
+        <li><span class="help-key">1</span>–<span class="help-key">9</span> Assign the nth speaker to the active caption (keys are configurable in Settings).</li>
+        <li><span class="help-key">`</span> Assign the previous different speaker to the active caption — useful for back-and-forth exchanges where the tool has assigned all lines to one speaker (key is configurable in Settings).</li>
+        <li>Manually edited captions are highlighted in <span style="color:#77ff77;">green</span> so you can track your progress.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Editing caption text</h3>
+      <ul>
+        <li><strong>Double-click any caption text</strong> to enter inline edit mode. The video pauses automatically.</li>
+        <li><span class="help-key">Enter</span> or clicking away commits the edit.</li>
+        <li><span class="help-key">Escape</span> reverts the caption to its original text.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Slow motion</h3>
+      <ul>
+        <li>Press <span class="help-key">/</span> (configurable in Settings) to toggle slow-motion playback. A speed badge appears in the header while active.</li>
+        <li>The slow-motion rate is adjustable in Settings (default 0.5×).</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Saving</h3>
+      <ul>
+        <li>Click <strong>Save</strong> (top-right) to save your progress. Each save creates a new version.</li>
+        <li>There is no undo — double-check before using the Apply to all feature.</li>
+        <li>You can switch episodes from the dropdown in the header; you'll be warned if there are unsaved changes.</li>
+        <li>Click <strong>I'm Done!</strong> when you've finished the episode. You can also indicate you're ready for a new episode at that point.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Settings <span style="font-size:0.9em;">⚙</span></h3>
+      <ul>
+        <li>Click <strong>⚙</strong> (top-right) to open settings. Use <strong>Reset all</strong> to restore every setting to its default.</li>
+        <li><strong>Scroll delay</strong> — how long to wait before the transcript auto-scrolls to the active caption (default 200 ms).</li>
+        <li><strong>Poll interval</strong> — how often the transcript highlight is synced with the video position (default 150 ms).</li>
+        <li><strong>Scroll duration (near)</strong> — animation duration when scrolling a short distance, below the cutoff (default 800 ms).</li>
+        <li><strong>Scroll duration (far)</strong> — animation duration when scrolling a long distance, above the cutoff (default 300 ms).</li>
+        <li><strong>Scroll distance cutoff</strong> — pixel threshold that determines whether near or far duration is used (default 300 px).</li>
+        <li><strong>Slow motion</strong> — configure the toggle key and playback rate (default key <span class="help-key">/</span>, default rate 0.5×).</li>
+        <li><strong>Speaker colors &amp; keys</strong> — customize the color and keyboard shortcut for each of the 9 speaker slots. Changes take effect immediately and are saved for your next visit.</li>
+      </ul>
+    </div>
+
+    <p class="help-note">
+      <strong>Known limitations:</strong> rapid back-and-forth banter and live studio tasks tend to have more speaker errors.
+      Speaker boundaries are sometimes off by one caption.
+      Timecodes are mostly in sync but may drift slightly in some spots.
+    </p>
+
+  </div>
+</div>
+
+<div id="speaker-dropdown" class="speaker-dropdown" style="display:none"></div>
+
+<div id="apply-all-toast">
+  <span id="apply-all-msg"></span>
+  <button class="bar-btn" id="apply-all-btn">Apply</button>
+  <button class="bar-btn dismiss" id="apply-all-dismiss">Cancel</button>
+</div>
+
+<div id="app">
+  <div id="video-title" style="position:relative">
+    <select id="episode-select"></select>
+    <span id="version-badge"></span>
+    <span id="slomo-badge" style="display:none;font-size:0.8rem;color:#f0a500;"></span>
+    <button id="undo-btn" title="Undo (Ctrl+Z)">↺</button>
+    <button id="redo-btn" title="Redo (Ctrl+Y)">↻</button>
+    <button id="save-btn">Save</button>
+    <button id="done-btn">I'm Done!</button>
+    <button id="help-btn" title="Help">?</button>
+    <button id="settings-btn" title="Settings">⚙</button>
+    <div id="settings-popup">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Settings</h3>
+        <button id="reset-all-settings" class="reset-btn">Reset all</button>
+      </div>
+      <div class="setting-row">
+        <label title="How long to wait after the active caption changes before auto-scrolling begins">Scroll delay <span id="scroll-delay-val"></span></label>
+        <input type="range" id="scroll-delay-slider" min="0" max="3000" step="50" title="How long to wait after the active caption changes before scrolling to it" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="How often the transcript highlight is synced with the video playback position">Poll interval <span id="poll-interval-val"></span></label>
+        <input type="range" id="poll-interval-slider" min="50" max="3000" step="50" title="How often the transcript's active caption is synced with the video playback position" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="Animation duration when scrolling a short distance (below the cutoff)">Scroll duration (near) <span id="scroll-duration-near-val"></span></label>
+        <input type="range" id="scroll-duration-near-slider" min="100" max="3000" step="50" title="Animation duration when scrolling a short distance (below the cutoff)" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="Animation duration when scrolling a long distance (above the cutoff)">Scroll duration (far) <span id="scroll-duration-far-val"></span></label>
+        <input type="range" id="scroll-duration-far-slider" min="50" max="3000" step="50" title="Animation duration when scrolling a long distance (above the cutoff)" />
+      </div>
+      <div class="setting-row" style="margin-top:8px;">
+        <label title="Pixel distance that determines whether the near or far scroll duration is used">Scroll distance cutoff <span id="scroll-distance-cutoff-val"></span></label>
+        <input type="range" id="scroll-distance-cutoff-slider" min="50" max="1000" step="25" title="Pixel distance that determines whether the near or far scroll duration is used" />
+      </div>
+      <div class="setting-row" style="margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label>Slow motion</label>
+          <input type="text" id="slomo-key-input" class="key-input" />
+          <span id="slomo-rate-val"></span>
+        </div>
+        <input type="range" id="slomo-rate-slider" min="0.05" max="0.95" step="0.05" />
+      </div>
+      <div class="setting-row" style="margin-top:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <label>Speaker colors &amp; keys</label>
+        </div>
+        <div id="speaker-color-rows" style="margin-top:6px;"></div>
+      </div>
+    </div>
+  </div>
+  <div id="main">
+    <div id="video-panel">
+      <div id="player-container">
+        <div id="player"></div>
+      </div>
+    </div>
+    <div id="panel-splitter"></div>
+    <div id="transcript-panel">
+      <div id="transcript-header">Transcript</div>
+      <div id="transcript-scroll"></div>
+    </div>
+  </div>
+  <div id="help-modal">
+    <div id="help-modal-inner">
+      <button id="help-modal-close" title="Close">✕</button>
+    </div>
+  </div>
+  <div id="done-modal">
+    <div id="done-modal-inner">
+      <p>I have finished this episode (email Peter if you change your mind)</p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="done-wants-more" />
+        I'm ready for another episode
+      </label>
+      <div class="modal-btns">
+        <button id="done-modal-cancel">Cancel</button>
+        <button id="done-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Speaker colors & keys ──────────────────────────────────────────────────
+  const DEFAULT_SPEAKER_COLORS = ['#f0a500','#e05c5c','#4caf7d','#5b9cf6','#b06fd8','#00bcd4','#ff7043','#c6ccaa','#e9508a'];
+  const DEFAULT_SPEAKER_KEYS      = ['1','2','3','4','5','6','7','8','9'];
+  const DEFAULT_PREV_SPEAKER_KEY  = '`';
+  const DEFAULT_SLOMO_KEY   = '/';
+  const DEFAULT_SLOMO_RATE  = 0.5;
+  let speakerColors  = JSON.parse(localStorage.getItem('speakerColors') || 'null') || [...DEFAULT_SPEAKER_COLORS];
+  let speakerKeys    = JSON.parse(localStorage.getItem('speakerKeys')   || 'null') || [...DEFAULT_SPEAKER_KEYS];
+  let prevSpeakerKey = localStorage.getItem('prevSpeakerKey') ?? DEFAULT_PREV_SPEAKER_KEY;
+  let slowMoKey      = localStorage.getItem('slowMoKey')      ?? DEFAULT_SLOMO_KEY;
+  let slowMoRate     = parseFloat(localStorage.getItem('slowMoRate'))  || DEFAULT_SLOMO_RATE;
+  let isSloMo        = false;
+
+  function applySpeakerColors() {
+    speakerColors.forEach((color, i) => document.documentElement.style.setProperty(`--sp-color-${i}`, color));
+  }
+  applySpeakerColors();
+
+  // ── Animation constants ────────────────────────────────────────────────────
+  let POLL_INTERVAL_MS       = parseInt(localStorage.getItem('pollIntervalMs')      ?? '150', 10); // how often to sync transcript highlight with video; user-configurable
+  let SCROLL_DELAY_MS        = parseInt(localStorage.getItem('scrollDelayMs')       ?? '200', 10); // pause before auto-scroll begins after active caption changes; user-configurable
+  let SCROLL_DURATION_NEAR   = parseInt(localStorage.getItem('scrollDurationNear')  ?? '800', 10); // animation duration (ms) for small scroll distances; user-configurable
+  let SCROLL_DURATION_FAR   = parseInt(localStorage.getItem('scrollDurationFar')  ?? '300', 10); // animation duration (ms) for large scroll distances; user-configurable
+  let SCROLL_DISTANCE_CUTOFF = parseInt(localStorage.getItem('scrollDistanceCutoff')?? '300', 10); // pixel threshold between slow and fast scroll; user-configurable
+  const SAVE_FEEDBACK_MS       = 3000; // how long to show save success/error on the button
+  const USER_SCROLL_TIMEOUT_MS = 3000; // how long after manual scroll before auto-scroll resumes
+  const TOAST_DURATION_MS      = 5000; // how long the apply-all toast stays before auto-dismissing
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let transcriptData = null;
+  let unsavedChanges = false;
+  let currentVersionUid = null;
+  let captions = [];
+  let speakerMap = {};
+  let speakerCount = 0;
+  let renderedSpeakerClasses = {};
+  let ytPlayer = null;
+  let activeIndex = -1;
+  let pollInterval = null;
+  let userScrolling = false;
+  let userScrollTimer = null;
+  let scrollAnimFrame = null;
+  let scrollDelayTimer = null;
+  const editMode = true;
+  const MAX_UNDO = 50;
+  let undoStack = [];
+  let redoStack = [];
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function parseStart(startStr) {
+    return parseFloat(String(startStr).trim().replace('s', ''));
+  }
+
+  function formatTime(seconds) {
+    const s = Math.floor(seconds);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const ss = String(s % 60).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+
+  function speakerClass(speaker) {
+    if (!speaker || speaker === 'UNKNOWN') return 'speaker-unknown';
+    if (speaker === 'MULTIPLE') return 'speaker-multiple';
+    if (!(speaker in speakerMap)) {
+      speakerMap[speaker] = speakerCount % 9;
+      speakerCount++;
+    }
+    return `speaker-${speakerMap[speaker]}`;
+  }
+
+  let SPEAKERS = [];
+  let _duplicateFirstNames = new Set();
+
+  function buildSpeakerMap() {
+    speakerMap = {};
+    speakerCount = 0;
+    renderedSpeakerClasses = {};
+    // Pre-seed named speakers in SPEAKERS order so colors are stable across edits
+    SPEAKERS.forEach(sp => speakerClass(sp));
+  }
+
+  function updateSpeakers(names) {
+    SPEAKERS = [...names, 'Other', 'MULTIPLE'];
+    const counts = {};
+    SPEAKERS.forEach(sp => {
+      const first = firstName(sp);
+      counts[first] = (counts[first] || 0) + 1;
+    });
+    _duplicateFirstNames = new Set(Object.keys(counts).filter(f => counts[f] > 1));
+  }
+
+  function firstName(speaker) {
+    return speaker.split(' ')[0];
+  }
+
+  function speakerLabel(speaker) {
+    if (!speaker || speaker === 'UNKNOWN') return 'Unknown';
+    const first = firstName(speaker);
+    return _duplicateFirstNames.has(first) ? speaker : first;
+  }
+
+  // ── Undo / redo ───────────────────────────────────────────────────────────
+  function updateUndoButtons() {
+    document.getElementById('undo-btn').disabled = undoStack.length === 0;
+    document.getElementById('redo-btn').disabled = redoStack.length === 0;
+  }
+
+  function pushUndo() {
+    undoStack.push(JSON.parse(JSON.stringify(captions)));
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+    redoStack = [];
+    updateUndoButtons();
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    redoStack.push(JSON.parse(JSON.stringify(captions)));
+    captions = undoStack.pop();
+    unsavedChanges = true;
+    reRender();
+    updateUndoButtons();
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    undoStack.push(JSON.parse(JSON.stringify(captions)));
+    captions = redoStack.pop();
+    unsavedChanges = true;
+    reRender();
+    updateUndoButtons();
+  }
+
+  // ── Edit mode operations ───────────────────────────────────────────────────
+  function parseTimeInput(str) {
+    str = String(str).trim();
+    const parts = str.split(':');
+    if (parts.length === 3) return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
+    if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+    return parseFloat(str);
+  }
+
+  function getCursorOffsetInSpan(span) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const range = sel.getRangeAt(0);
+    if (!span.contains(range.startContainer)) return null;
+    return range.startOffset;
+  }
+
+  function reRender() {
+    buildSpeakerMap();
+    activeIndex = -1;
+    const scrollEl = document.getElementById('transcript-scroll');
+    const scrollTop = scrollEl.scrollTop;
+    renderTranscript();
+    scrollEl.scrollTop = scrollTop;
+  }
+
+  function deleteCaption(i) {
+    pushUndo();
+    captions.splice(i, 1);
+    unsavedChanges = true;
+    reRender();
+  }
+
+  function insertCaption(afterIndex) {
+    let newStart, newDuration;
+    if (afterIndex < 0) {
+      const firstStart = captions.length ? parseStart(captions[0].start) : 1;
+      newStart = Math.max(0, firstStart - 1);
+      newDuration = firstStart - newStart;
+    } else {
+      const prev = captions[afterIndex];
+      const next = captions[afterIndex + 1];
+      const prevStart = parseStart(prev.start);
+      if (next) {
+        const nextStart = parseStart(next.start);
+        newStart = (prevStart + nextStart) / 2;
+        newDuration = nextStart - newStart;
+      } else {
+        const prevDur = typeof prev.duration === 'number' ? prev.duration : 1;
+        newStart = prevStart + prevDur;
+        newDuration = 1;
+      }
+    }
+    const insertAt = Math.max(0, afterIndex + 1);
+    const templateSpeaker = afterIndex >= 0 ? captions[afterIndex].speaker : (captions[0] && captions[0].speaker) || 'UNKNOWN';
+    pushUndo();
+    captions.splice(insertAt, 0, { text: '', start: newStart, duration: newDuration, speaker: templateSpeaker, modified: false });
+    unsavedChanges = true;
+    buildSpeakerMap();
+    activeIndex = -1;
+    const scrollEl = document.getElementById('transcript-scroll');
+    const scrollTop = scrollEl.scrollTop;
+    renderTranscript();
+    scrollEl.scrollTop = scrollTop;
+    const lines = document.querySelectorAll('.caption-line');
+    const newLine = lines[insertAt];
+    if (newLine) {
+      const ts = newLine.querySelector('.caption-text');
+      if (ts) {
+        if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+        ts.contentEditable = 'true';
+        ts.focus();
+      }
+      newLine.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function splitCaption(i, charOffset) {
+    const cap = captions[i];
+    const fullText = cap.text;
+    const leftText = fullText.slice(0, charOffset).replace(/\s+$/, '');
+    const rightText = fullText.slice(charOffset).replace(/^\s+/, '');
+    const startVal = parseStart(cap.start);
+    const totalDur = typeof cap.duration === 'number' ? cap.duration : 1;
+    const ratio = fullText.length > 0 ? charOffset / fullText.length : 0.5;
+    const leftDur = totalDur * ratio;
+    pushUndo();
+    captions.splice(i, 1,
+      { ...cap, text: leftText, duration: leftDur },
+      { ...cap, text: rightText, start: startVal + leftDur, duration: totalDur - leftDur, modified: false }
+    );
+    unsavedChanges = true;
+    reRender();
+  }
+
+  // ── Speaker list ───────────────────────────────────────────────────────────
+  function makeSpeakerBtn(label, cls, onClick) {
+    const btn = document.createElement('button');
+    btn.className = `speaker-btn ${cls}`;
+    btn.innerHTML = `<span class="caption-speaker">${label}</span><span class="chevron">▾</span>`;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function showSpeakerDropdown(anchorEl, rawSpeaker, onSelect) {
+    if (scrollAnimFrame) { cancelAnimationFrame(scrollAnimFrame); scrollAnimFrame = null; }
+    if (scrollDelayTimer) { clearTimeout(scrollDelayTimer); scrollDelayTimer = null; }
+    if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+    const dropdown = document.getElementById('speaker-dropdown');
+    dropdown.innerHTML = '';
+    SPEAKERS.forEach(sp => {
+      const item = document.createElement('div');
+      item.className = `speaker-dropdown-item ${renderedSpeakerClasses[sp] || speakerClass(sp)}` + (sp === rawSpeaker ? ' current' : '');
+      item.textContent = sp;
+      item.addEventListener('click', e => {
+        e.stopPropagation();
+        if (sp !== rawSpeaker) onSelect(sp);
+        hideSpeakerDropdown();
+      });
+      dropdown.appendChild(item);
+    });
+
+    const rect = anchorEl.getBoundingClientRect();
+    dropdown.style.display = 'block';
+    // Position below anchor, flip up if too close to bottom
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 260) {
+      dropdown.style.top = (rect.top + window.scrollY - dropdown.offsetHeight - 4) + 'px';
+    } else {
+      dropdown.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    }
+    dropdown.style.left = rect.left + 'px';
+  }
+
+  function hideSpeakerDropdown() {
+    document.getElementById('speaker-dropdown').style.display = 'none';
+  }
+
+  document.addEventListener('click', hideSpeakerDropdown);
+  window.addEventListener('blur', hideSpeakerDropdown);
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if (document.activeElement && document.activeElement.contentEditable === 'true') return;
+      e.preventDefault(); undo(); return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'Z' && e.shiftKey))) {
+      if (document.activeElement && document.activeElement.contentEditable === 'true') return;
+      e.preventDefault(); redo(); return;
+    }
+    if (e.key === '?') { helpModal.classList.toggle('open'); if (helpModal.classList.contains('open')) openHelpModal(); return; }
+    if (e.key === 'Escape') { helpModal.classList.remove('open'); return; }
+    if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      ytPlayer.getPlayerState() === YT.PlayerState.PLAYING ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
+    } else if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+      e.preventDefault();
+      const next = e.code === 'ArrowUp' ? activeIndex - 1 : activeIndex + 1;
+      if (next >= 0 && next < captions.length) {
+        activateCaption(next);
+        seekTo(parseStart(captions[next].start), ytPlayer.getPlayerState() === YT.PlayerState.PLAYING);
+      }
+    } else if (speakerKeys.includes(e.key)) {
+      const speaker = SPEAKERS[speakerKeys.indexOf(e.key)];
+      if (speaker && activeIndex >= 0) {
+        e.preventDefault();
+        setSpeaker([activeIndex], speaker);
+      }
+    } else if (e.key === prevSpeakerKey) {
+      if (activeIndex > 0) {
+        e.preventDefault();
+        const currentSpeaker = captions[activeIndex].speaker;
+        let prevSpeaker = null;
+        for (let i = activeIndex - 1; i >= 0; i--) {
+          if (captions[i].speaker !== currentSpeaker) {
+            prevSpeaker = captions[i].speaker;
+            break;
+          }
+        }
+        if (prevSpeaker) setSpeaker([activeIndex], prevSpeaker);
+      }
+    } else if (e.key === slowMoKey) {
+      if (ytPlayer && typeof ytPlayer.setPlaybackRate === 'function') {
+        e.preventDefault();
+        isSloMo = !isSloMo;
+        ytPlayer.setPlaybackRate(isSloMo ? slowMoRate : 1);
+        const badge = document.getElementById('slomo-badge');
+        badge.textContent = isSloMo ? `${slowMoRate}x` : '';
+        badge.style.display = isSloMo ? '' : 'none';
+      }
+    }
+  });
+
+  window.addEventListener('beforeunload', e => {
+    if (unsavedChanges) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  function setSpeaker(indices, newSpeaker, skipBarCheck = false) {
+    pushUndo();
+    const changedSet = new Set(indices);
+    // Collect distinct old speakers being replaced (before mutating)
+    const oldSpeakers = [...new Set(indices.map(i => captions[i].speaker))];
+
+    indices.forEach(i => {
+      const wasAutoAssigned = (captions[i].speaker || '').startsWith('SPEAKER_');
+      captions[i].speaker = newSpeaker;
+      if (!wasAutoAssigned) captions[i].modified = true;
+    });
+    unsavedChanges = true;
+    buildSpeakerMap();
+    activeIndex = -1;
+    const scrollEl = document.getElementById('transcript-scroll');
+    const scrollTop = scrollEl.scrollTop;
+    renderTranscript();
+    scrollEl.scrollTop = scrollTop;
+
+    hideApplyAllBar();
+
+    if (skipBarCheck) return;
+
+    // For each old SPEAKER_* value, check if any unchanged captions still carry it
+    oldSpeakers.forEach(old => {
+      if (!/^SPEAKER_/i.test(old)) return;
+      const remaining = captions
+        .map((c, i) => ({ c, i }))
+        .filter(({ c, i }) => c.speaker === old && !changedSet.has(i));
+      if (remaining.length === 0) return;
+
+      const remainingIndices = remaining.map(({ i }) => i);
+      showApplyAllBar(old, newSpeaker, remainingIndices);
+    });
+  }
+
+  function applyBracketedNameOverrides() {
+    const firstNameMap = {};
+    SPEAKERS.forEach(sp => {
+      const first = firstName(sp).toLowerCase();
+      firstNameMap[first] = sp;
+    });
+
+    captions.forEach(cap => {
+      if (cap.modified) return;
+      if (cap.speaker && !cap.speaker.startsWith('SPEAKER_') && cap.speaker !== 'UNKNOWN' && cap.speaker !== 'Other') return;
+      const m = cap.text.match(/^\[(\w+)/);
+      if (!m) return;
+      const fullName = firstNameMap[m[1].toLowerCase()];
+      if (fullName) cap.speaker = fullName;
+    });
+  }
+
+  let toastTimer = null;
+
+  function showApplyAllBar(oldSpeaker, newSpeaker, remainingIndices) {
+    const toast    = document.getElementById('apply-all-toast');
+    const msg      = document.getElementById('apply-all-msg');
+    const applyBtn = document.getElementById('apply-all-btn');
+
+    msg.innerHTML = `Apply <code>${oldSpeaker}</code> → <strong>${newSpeaker}</strong> update to all ${remainingIndices.length} other caption${remainingIndices.length !== 1 ? 's' : ''}`;
+
+    const newApplyBtn = applyBtn.cloneNode(true);
+    applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
+    newApplyBtn.addEventListener('click', () => {
+      setSpeaker(remainingIndices, newSpeaker, true);
+      hideApplyAllBar();
+    });
+
+    toast.classList.add('visible');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideApplyAllBar, TOAST_DURATION_MS);
+  }
+
+  function hideApplyAllBar() {
+    document.getElementById('apply-all-toast').classList.remove('visible');
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+  }
+
+  document.getElementById('apply-all-dismiss').addEventListener('click', hideApplyAllBar);
+
+  // ── Panel splitter ─────────────────────────────────────────────────────────
+  const splitter   = document.getElementById('panel-splitter');
+  const videoPanel = document.getElementById('video-panel');
+  const mainEl     = document.getElementById('main');
+
+  // Overlay blocks the YouTube iframe from swallowing mouse events during drag
+  const dragShield = document.createElement('div');
+  dragShield.style.cssText = 'position:absolute;inset:0;z-index:10;display:none;';
+  videoPanel.style.position = 'relative';
+  videoPanel.appendChild(dragShield);
+
+  splitter.addEventListener('mousedown', e => {
+    e.preventDefault();
+    splitter.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    dragShield.style.display = 'block';
+
+    function onMouseMove(e) {
+      const mainRect = mainEl.getBoundingClientRect();
+      const pct = ((e.clientX - mainRect.left) / mainRect.width) * 100;
+      videoPanel.style.flex = `0 0 ${Math.min(80, Math.max(20, pct))}%`;
+    }
+
+    function onMouseUp() {
+      splitter.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      dragShield.style.display = 'none';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+
+  // ── Transcript rendering ───────────────────────────────────────────────────
+  function clearSelected() {
+    document.querySelectorAll('.caption-line.selected')
+      .forEach(el => el.classList.remove('selected'));
+  }
+
+  function renderTranscript() {
+    const container = document.getElementById('transcript-scroll');
+    container.innerHTML = '';
+
+    // Pre-compute groups so we know each group's size before rendering
+    const groups = [];
+    captions.forEach((cap, i) => {
+      if (!groups.length || cap.speaker !== groups[groups.length - 1].speaker) {
+        groups.push({ speaker: cap.speaker, indices: [] });
+      }
+      groups[groups.length - 1].indices.push(i);
+    });
+
+    groups.forEach(group => {
+      const firstCap = captions[group.indices[0]];
+      const cls = speakerClass(firstCap.speaker);
+      const label = speakerLabel(firstCap.speaker);
+      const groupIndices = group.indices;
+
+      const groupEl = document.createElement('div');
+      groupEl.className = 'speaker-group';
+
+      if (group.indices.length > 1) {
+        const header = document.createElement('div');
+        header.className = `speaker-group-header ${cls}`;
+
+        const headerBtn = makeSpeakerBtn(label, cls, e => {
+          e.stopPropagation();
+          showSpeakerDropdown(headerBtn, firstCap.speaker, newSpeaker => {
+            setSpeaker(groupIndices.slice(), newSpeaker);
+          });
+        });
+        header.appendChild(headerBtn);
+        groupEl.appendChild(header);
+      }
+
+      container.appendChild(groupEl);
+
+      group.indices.forEach(i => {
+        const cap = captions[i];
+        const start = parseStart(cap.start);
+
+        const capCls = speakerClass(cap.speaker);
+        renderedSpeakerClasses[cap.speaker] = capCls;
+        const capLabel = speakerLabel(cap.speaker);
+
+        const line = document.createElement('div');
+        line.className = 'caption-line' + (cap.modified ? ' modified' : '');
+        line.dataset.index = i;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'caption-time';
+        timeSpan.textContent = formatTime(start);
+
+        const captionSpeakerBtn = makeSpeakerBtn(capLabel, capCls, e => {
+          e.stopPropagation();
+          showSpeakerDropdown(captionSpeakerBtn, cap.speaker, newSpeaker => {
+            setSpeaker([i], newSpeaker);
+          });
+        });
+
+        const textSpan = document.createElement('span');
+        textSpan.className = 'caption-text';
+        textSpan.textContent = cap.text;
+
+        // splitBtn reference so blur/dblclick handlers can show/hide it
+        let splitBtn = null;
+
+        textSpan.addEventListener('dblclick', e => {
+          e.stopPropagation();
+          if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+          textSpan.contentEditable = 'true';
+          if (splitBtn) splitBtn.style.display = 'inline-block';
+          textSpan.focus();
+        });
+
+        textSpan.addEventListener('blur', () => {
+          textSpan.contentEditable = 'false';
+          if (splitBtn) splitBtn.style.display = 'none';
+          const newText = textSpan.textContent;
+          if (newText !== captions[i].text) {
+            pushUndo();
+            captions[i].text = newText;
+            captions[i].modified = true;
+            unsavedChanges = true;
+            line.classList.toggle('modified', !!captions[i].modified);
+          }
+        });
+
+        textSpan.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); textSpan.blur(); }
+          if (e.key === 'Escape') { textSpan.textContent = captions[i].text; textSpan.blur(); }
+          e.stopPropagation();
+        });
+
+        textSpan.addEventListener('click', e => {
+          if (textSpan.contentEditable === 'true') e.stopPropagation();
+        });
+
+        line.appendChild(timeSpan);
+        line.appendChild(captionSpeakerBtn);
+        line.appendChild(textSpan);
+
+        // Edit mode: time editing + split/delete buttons + insert rows
+        if (editMode) {
+          timeSpan.classList.add('editable-time');
+          timeSpan.title = 'Double-click to edit start time';
+
+          timeSpan.addEventListener('dblclick', e => {
+            e.stopPropagation();
+            if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+            timeSpan.contentEditable = 'true';
+            timeSpan.focus();
+            const range = document.createRange();
+            range.selectNodeContents(timeSpan);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          });
+
+          timeSpan.addEventListener('blur', () => {
+            timeSpan.contentEditable = 'false';
+            const newSeconds = parseTimeInput(timeSpan.textContent);
+            if (!isNaN(newSeconds) && newSeconds >= 0 && newSeconds !== start) {
+              pushUndo();
+              captions[i].start = newSeconds;
+              captions.sort((a, b) => parseStart(a.start) - parseStart(b.start));
+              unsavedChanges = true;
+              reRender();
+            } else {
+              timeSpan.textContent = formatTime(start);
+            }
+          });
+
+          timeSpan.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); timeSpan.blur(); }
+            if (e.key === 'Escape') { timeSpan.textContent = formatTime(start); timeSpan.blur(); }
+            e.stopPropagation();
+          });
+
+          timeSpan.addEventListener('click', e => {
+            if (timeSpan.contentEditable === 'true') e.stopPropagation();
+          });
+
+          const editBtns = document.createElement('div');
+          editBtns.className = 'caption-edit-btns';
+
+          splitBtn = document.createElement('button');
+          splitBtn.className = 'caption-split-btn';
+          splitBtn.title = 'Split caption at cursor position';
+          splitBtn.textContent = '✂';
+
+          splitBtn.addEventListener('mousedown', e => {
+            e.preventDefault(); // always keep focus+cursor in textSpan
+          });
+
+          splitBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            const offset = getCursorOffsetInSpan(textSpan);
+            const charOffset = offset !== null ? offset : Math.floor(captions[i].text.length / 2);
+            textSpan.contentEditable = 'false';
+            splitCaption(i, charOffset);
+          });
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'caption-delete-btn';
+          deleteBtn.title = 'Delete caption';
+          deleteBtn.textContent = '×';
+          deleteBtn.addEventListener('click', e => { e.stopPropagation(); deleteCaption(i); });
+
+          const insertBtn = document.createElement('button');
+          insertBtn.className = 'caption-insert-btn';
+          insertBtn.title = 'Insert caption below';
+          insertBtn.textContent = '+';
+          insertBtn.addEventListener('click', e => { e.stopPropagation(); insertCaption(i); });
+
+          editBtns.appendChild(splitBtn);
+          editBtns.appendChild(deleteBtn);
+          editBtns.appendChild(insertBtn);
+          line.appendChild(editBtns);
+        }
+
+        line.addEventListener('click', () => {
+          if (textSpan.contentEditable === 'true') return;
+          if (timeSpan.contentEditable === 'true') return;
+          clearSelected();
+          line.classList.add('selected');
+          seekTo(start, true);
+        });
+        groupEl.appendChild(line);
+      });
+    });
+  }
+
+  function decodeHtml(str) {
+    const el = document.createElement('textarea');
+    el.innerHTML = str;
+    return el.value;
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // ── Sync logic ─────────────────────────────────────────────────────────────
+  function findActiveIndex(currentTime) {
+    // Binary-search for the last caption whose start <= currentTime
+    let lo = 0, hi = captions.length - 1, result = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (parseStart(captions[mid].start) <= currentTime) {
+        result = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return result;
+  }
+
+  function activateCaption(idx) {
+    activeIndex = idx;
+    const lines = document.querySelectorAll('.caption-line');
+    lines.forEach((el, i) => {
+      el.classList.toggle('active', i === idx);
+    });
+
+    if (idx >= 0 && !userScrolling) {
+      const el = lines[idx];
+      const panel = document.getElementById('transcript-scroll');
+      const elRect = el.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const targetScroll = panel.scrollTop + (elRect.top - panelRect.top) - panel.clientHeight / 2 + el.offsetHeight / 2;
+      const distance = Math.abs(targetScroll - panel.scrollTop);
+      const duration = distance < SCROLL_DISTANCE_CUTOFF ? SCROLL_DURATION_NEAR : SCROLL_DURATION_FAR;
+      const startScroll = panel.scrollTop;
+      const delta = targetScroll - startScroll;
+      if (scrollAnimFrame) cancelAnimationFrame(scrollAnimFrame);
+      if (scrollDelayTimer) clearTimeout(scrollDelayTimer);
+      scrollDelayTimer = setTimeout(() => {
+        scrollDelayTimer = null;
+        const startTime = performance.now();
+        (function step(now) {
+          const t = Math.min((now - startTime) / duration, 1);
+          const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+          panel.scrollTop = startScroll + delta * ease;
+          scrollAnimFrame = t < 1 ? requestAnimationFrame(step) : null;
+        })(startTime);
+      }, SCROLL_DELAY_MS);
+    }
+  }
+
+  function syncTranscript() {
+    if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
+    let currentTime;
+    try { currentTime = ytPlayer.getCurrentTime(); } catch { return; }
+    const idx = findActiveIndex(currentTime);
+    if (idx === activeIndex) return;
+    activateCaption(idx);
+  }
+
+  function seekTo(seconds, play = false) {
+    if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+	  if(!play) ytPlayer.pauseVideo();
+      ytPlayer.seekTo(seconds, true);
+      if(play) ytPlayer.playVideo();
+    }
+  }
+
+  // ── YouTube IFrame API ─────────────────────────────────────────────────────
+  function loadYouTubeAPI() {
+    return new Promise(resolve => {
+      if (window.YT && window.YT.Player) { resolve(); return; }
+      window.onYouTubeIframeAPIReady = resolve;
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    });
+  }
+
+  async function initPlayer(videoId, seekSeconds = null) {
+    await loadYouTubeAPI();
+    let seekPauseOnce = seekSeconds !== null;
+    ytPlayer = new YT.Player('player', {
+      videoId,
+      playerVars: { rel: 0, modestbranding: 1 },
+      events: {
+        onReady() {
+          if (seekSeconds !== null) ytPlayer.seekTo(seekSeconds, true);
+          clearInterval(pollInterval);
+          pollInterval = setInterval(syncTranscript, POLL_INTERVAL_MS);
+        },
+        onStateChange(event) {
+          if (seekPauseOnce && event.data === YT.PlayerState.PLAYING) {
+            seekPauseOnce = false;
+            ytPlayer.pauseVideo();
+          }
+        }
+      }
+    });
+  }
+
+  // ── API loading ────────────────────────────────────────────────────────────
+  function showLoadError(msg) {
+    const el = document.getElementById('load-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  const params  = new URLSearchParams(window.location.search);
+  const userUid = params.get('user');
+  const preselectedEpisodeUid = params.get('episode');
+
+  if (!userUid) {
+    document.getElementById('load-status').textContent = 'No user specified. Please open this page with a valid ?user= parameter.';
+    throw new Error('No user specified');
+  }
+
+  async function fetchTranscriptList() {
+    const statusEl = document.getElementById('load-status');
+    const selectEl     = document.getElementById('transcript-select');
+    const btnEl        = document.getElementById('load-btn');
+    const actionsEl    = document.getElementById('load-actions');
+    try {
+      const url = `./transcripts.py?user=${encodeURIComponent(userUid)}`;
+      const res = await fetch(url);
+      const resData = await res.json().catch(() => null);
+      if (res.status === 404 && resData?.error === 'User not found') {
+        statusEl.style.display = 'none';
+        const errEl = document.getElementById('load-error');
+        errEl.innerHTML = 'User not found. If you would like to volunteer, <a href="./signup.html" class="cyan-link">sign up here</a> to get started.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!res.ok) throw new Error(resData?.error || `Server returned ${res.status}`);
+      const { name, episodes: list } = resData;
+      if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
+      if (!list.length) {
+        statusEl.textContent = 'No available transcripts currently assigned to you.';
+        actionsEl.style.display = 'flex';
+        btnEl.style.display = 'none';
+        return;
+      }
+      const episodeSelectEl = document.getElementById('episode-select');
+      list.forEach(({ version_id, title, version, is_complete }) => {
+        const label = decodeHtml(title || version_id);
+
+        const opt = document.createElement('option');
+        opt.value = version_id;
+        opt.textContent = label;
+        if (version != null) opt.dataset.version = version;
+        if (is_complete) opt.dataset.isComplete = '1';
+        selectEl.appendChild(opt);
+
+        const appOpt = opt.cloneNode(true);
+        episodeSelectEl.appendChild(appOpt);
+      });
+      // Auto-load by episode param or if only one transcript
+      const autoEntry = preselectedEpisodeUid
+        ? list.find(e => e.episode_uid === preselectedEpisodeUid)
+        : list.length === 1 ? list[0] : null;
+
+      if (autoEntry && preselectedEpisodeUid) {
+        try { await fetchAndLoad(autoEntry.version_id, autoEntry.version ?? null, autoEntry.is_complete ?? false); } catch (err) { showLoadError(`Could not load transcript: ${err.message}`); }
+        return;
+      }
+
+      statusEl.style.display = 'none';
+      selectEl.style.display = 'block';
+      actionsEl.style.display = 'flex';
+      if (autoEntry) {
+        selectEl.value = autoEntry.version_id;
+      }
+    } catch (err) {
+      statusEl.style.display = 'none';
+      showLoadError(`Could not load transcript list: ${err.message}`);
+    }
+  }
+
+  async function fetchAndLoad(versionUid, version, isComplete = false) {
+    const res = await fetch(`./transcripts.py?version=${versionUid}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    loadTranscript(data, version, versionUid, data.speakers || [], isComplete);
+  }
+
+  document.getElementById('load-btn').addEventListener('click', async () => {
+    const selectEl = document.getElementById('transcript-select');
+    const id = selectEl.value;
+    if (!id) return;
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    const version = selectedOpt.dataset.version ? parseInt(selectedOpt.dataset.version) : null;
+    const isComplete = selectedOpt.dataset.isComplete === '1';
+    try {
+      await fetchAndLoad(id, version, isComplete);
+    } catch (err) {
+      showLoadError(`Could not load transcript: ${err.message}`);
+    }
+  });
+
+  document.getElementById('wants-more-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('wants-more-btn');
+    const msg = document.getElementById('wants-more-msg');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    try {
+      const res = await fetch('./transcripts.py', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wants_more', user_uid: userUid }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Server returned ${res.status}`);
+      btn.style.display = 'none';
+      msg.style.display = 'block';
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "I'm ready for a new episode";
+      showLoadError(`Could not send request: ${err.message}`);
+    }
+  });
+
+  document.getElementById('episode-select').addEventListener('change', async () => {
+    const selectEl = document.getElementById('episode-select');
+    const versionUid = selectEl.value;
+    if (!versionUid || versionUid === currentVersionUid) return;
+
+    if (unsavedChanges && !confirm('You have unsaved changes. Switch episode anyway?')) {
+      selectEl.value = currentVersionUid;
+      return;
+    }
+
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    const version = selectedOpt.dataset.version ? parseInt(selectedOpt.dataset.version) : null;
+    const isComplete = selectedOpt.dataset.isComplete === '1';
+    try {
+      await fetchAndLoad(versionUid, version, isComplete);
+    } catch (err) {
+      selectEl.value = currentVersionUid;
+      alert(`Could not load episode: ${err.message}`);
+    }
+  });
+
+  document.getElementById('save-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const payload = { ...transcriptData, captions, user_uid: userUid, app_version: '2.0' };
+      const res = await fetch('./transcripts.py', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let result;
+      try { result = JSON.parse(text); } catch { throw new Error(text || res.status); }
+      if (!res.ok) throw new Error(result.error || res.status);
+      unsavedChanges = false;
+      if (result.version != null) setTitleVersion(result.version);
+      btn.textContent = 'Saved ✓';
+      btn.style.borderColor = '#4caf50';
+      btn.style.color = '#4caf50';
+      setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false; btn.style.borderColor = ''; btn.style.color = ''; }, SAVE_FEEDBACK_MS);
+    } catch (err) {
+      btn.textContent = 'Save failed';
+      btn.style.borderColor = '#f44336';
+      btn.style.color = '#f44336';
+      setTimeout(() => {
+        btn.textContent = 'Save';
+        btn.disabled = false;
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, SAVE_FEEDBACK_MS);
+    }
+  });
+
+  document.getElementById('done-btn').addEventListener('click', () => {
+    document.getElementById('done-wants-more').checked = false;
+    document.getElementById('done-modal').classList.add('open');
+  });
+
+  document.getElementById('done-modal-cancel').addEventListener('click', () => {
+    document.getElementById('done-modal').classList.remove('open');
+  });
+
+  document.getElementById('done-modal-ok').addEventListener('click', async () => {
+    const wantsMore = document.getElementById('done-wants-more').checked;
+    document.getElementById('done-modal').classList.remove('open');
+    const saveBtn = document.getElementById('save-btn');
+    const doneBtn = document.getElementById('done-btn');
+    saveBtn.disabled = true;
+    doneBtn.disabled = true;
+    doneBtn.textContent = 'Saving…';
+    try {
+      const payload = { ...transcriptData, captions, user_uid: userUid, is_complete: true, wants_more: wantsMore || undefined, app_version: '2.0' };
+      const res = await fetch('./transcripts.py', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let result;
+      try { result = JSON.parse(text); } catch { throw new Error(text || res.status); }
+      if (!res.ok) throw new Error(result.error || res.status);
+      unsavedChanges = false;
+      if (result.version != null) setTitleVersion(result.version);
+      doneBtn.textContent = 'Done ✓';
+      doneBtn.style.borderColor = '#4caf50';
+      doneBtn.style.color = '#4caf50';
+      doneBtn.disabled = true;
+      saveBtn.disabled = false;
+      // Mark both option elements so switching away and back reflects done state
+      for (const sel of ['transcript-select', 'episode-select']) {
+        const opt = document.querySelector(`#${sel} option[value="${currentVersionUid}"]`);
+        if (opt) opt.dataset.isComplete = '1';
+      }
+    } catch (err) {
+      doneBtn.textContent = "I'm Done!";
+      doneBtn.disabled = false;
+      saveBtn.disabled = false;
+      alert(`Failed to mark as complete: ${err.message}`);
+    }
+  });
+
+  document.getElementById('undo-btn').addEventListener('click', undo);
+  document.getElementById('redo-btn').addEventListener('click', redo);
+  updateUndoButtons();
+
+  fetchTranscriptList();
+
+  // ── Help modal ─────────────────────────────────────────────────────────────
+  const helpBtn        = document.getElementById('help-btn');
+  const helpModal      = document.getElementById('help-modal');
+  const helpModalInner = document.getElementById('help-modal-inner');
+  const helpModalClose = document.getElementById('help-modal-close');
+
+  function openHelpModal() {
+    // Populate from the load-screen help panel the first time
+    if (!helpModalInner.querySelector('.help-section')) {
+      const source = document.getElementById('help-panel');
+      source.querySelectorAll('.help-section, .help-note').forEach(el => {
+        helpModalInner.appendChild(el.cloneNode(true));
+      });
+    }
+    helpModal.classList.add('open');
+  }
+
+  helpBtn.addEventListener('click', () => openHelpModal());
+  helpModalClose.addEventListener('click', () => helpModal.classList.remove('open'));
+  helpModal.addEventListener('click', e => { if (e.target === helpModal) helpModal.classList.remove('open'); });
+
+  // ── Settings popup ─────────────────────────────────────────────────────────
+  const settingsBtn    = document.getElementById('settings-btn');
+  const settingsPopup  = document.getElementById('settings-popup');
+  const scrollSlider   = document.getElementById('scroll-delay-slider');
+  const scrollDelayVal = document.getElementById('scroll-delay-val');
+  const slomoSlider    = document.getElementById('slomo-rate-slider');
+  const slomoRateVal   = document.getElementById('slomo-rate-val');
+  const slomoKeyInput  = document.getElementById('slomo-key-input');
+
+  function updateScrollDelay(ms) {
+    SCROLL_DELAY_MS = ms;
+    localStorage.setItem('scrollDelayMs', ms);
+    scrollSlider.value = ms;
+    scrollDelayVal.textContent = `${ms}ms`;
+  }
+
+  const pollIntervalSlider       = document.getElementById('poll-interval-slider');
+  const pollIntervalVal          = document.getElementById('poll-interval-val');
+  const scrollDurationNearSlider = document.getElementById('scroll-duration-near-slider');
+  const scrollDurationNearVal    = document.getElementById('scroll-duration-near-val');
+  const scrollDurationFarSlider = document.getElementById('scroll-duration-far-slider');
+  const scrollDurationFarVal    = document.getElementById('scroll-duration-far-val');
+  const scrollDistanceCutoffSlider = document.getElementById('scroll-distance-cutoff-slider');
+  const scrollDistanceCutoffVal    = document.getElementById('scroll-distance-cutoff-val');
+
+  function updatePollInterval(ms) {
+    POLL_INTERVAL_MS = ms;
+    localStorage.setItem('pollIntervalMs', ms);
+    pollIntervalSlider.value = ms;
+    pollIntervalVal.textContent = `${ms}ms`;
+    if (pollInterval !== null) {
+      clearInterval(pollInterval);
+      pollInterval = setInterval(syncTranscript, POLL_INTERVAL_MS);
+    }
+  }
+
+  function updateScrollDurationNear(ms) {
+    SCROLL_DURATION_NEAR = ms;
+    localStorage.setItem('scrollDurationNear', ms);
+    scrollDurationNearSlider.value = ms;
+    scrollDurationNearVal.textContent = `${ms}ms`;
+  }
+
+  function updateScrollDurationFar(ms) {
+    SCROLL_DURATION_FAR = ms;
+    localStorage.setItem('scrollDurationFar', ms);
+    scrollDurationFarSlider.value = ms;
+    scrollDurationFarVal.textContent = `${ms}ms`;
+  }
+
+  function updateScrollDistanceCutoff(px) {
+    SCROLL_DISTANCE_CUTOFF = px;
+    localStorage.setItem('scrollDistanceCutoff', px);
+    scrollDistanceCutoffSlider.value = px;
+    scrollDistanceCutoffVal.textContent = `${px}px`;
+  }
+
+  pollIntervalSlider.addEventListener('input',         () => updatePollInterval(parseInt(pollIntervalSlider.value, 10)));
+  scrollDurationNearSlider.addEventListener('input',   () => updateScrollDurationNear(parseInt(scrollDurationNearSlider.value, 10)));
+  scrollDurationFarSlider.addEventListener('input',   () => updateScrollDurationFar(parseInt(scrollDurationFarSlider.value, 10)));
+  scrollDistanceCutoffSlider.addEventListener('input', () => updateScrollDistanceCutoff(parseInt(scrollDistanceCutoffSlider.value, 10)));
+
+  function updateSloMoRate(rate) {
+    slowMoRate = rate;
+    localStorage.setItem('slowMoRate', rate);
+    slomoSlider.value = rate;
+    slomoRateVal.textContent = `${rate}x`;
+    if (isSloMo && ytPlayer && typeof ytPlayer.setPlaybackRate === 'function') {
+      ytPlayer.setPlaybackRate(slowMoRate);
+      document.getElementById('slomo-badge').textContent = `${slowMoRate}x`;
+    }
+  }
+
+  slomoKeyInput.value = slowMoKey;
+  slomoKeyInput.addEventListener('keydown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') { slomoKeyInput.blur(); return; }
+    if (e.key.length === 1) {
+      slowMoKey = e.key;
+      slomoKeyInput.value = e.key;
+      localStorage.setItem('slowMoKey', slowMoKey);
+    }
+  });
+  slomoSlider.addEventListener('input', () => updateSloMoRate(parseFloat(slomoSlider.value)));
+
+  updateScrollDelay(SCROLL_DELAY_MS);
+  updatePollInterval(POLL_INTERVAL_MS);
+  updateScrollDurationNear(SCROLL_DURATION_NEAR);
+  updateScrollDurationFar(SCROLL_DURATION_FAR);
+  updateScrollDistanceCutoff(SCROLL_DISTANCE_CUTOFF);
+  updateSloMoRate(slowMoRate);
+
+  function renderSpeakerColorPickers() {
+    const container = document.getElementById('speaker-color-rows');
+    container.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+      const label = SPEAKERS[i] || `Speaker ${i + 1}`;
+      const row = document.createElement('div');
+      row.className = 'color-picker-row';
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = speakerColors[i];
+      colorInput.dataset.idx = i;
+      colorInput.addEventListener('input', e => {
+        const idx = parseInt(e.target.dataset.idx, 10);
+        speakerColors[idx] = e.target.value;
+        localStorage.setItem('speakerColors', JSON.stringify(speakerColors));
+        document.documentElement.style.setProperty(`--sp-color-${idx}`, e.target.value);
+      });
+      const keyInput = document.createElement('input');
+      keyInput.type = 'text';
+      keyInput.className = 'key-input';
+      keyInput.value = speakerKeys[i] || '';
+      keyInput.dataset.idx = i;
+      keyInput.addEventListener('keydown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === 'Escape') { keyInput.blur(); return; }
+        if (e.key.length === 1) {
+          const idx = parseInt(keyInput.dataset.idx, 10);
+          speakerKeys[idx] = e.key;
+          keyInput.value = e.key;
+          localStorage.setItem('speakerKeys', JSON.stringify(speakerKeys));
+        }
+      });
+      const nameSpan = document.createElement('span');
+      nameSpan.className = `speaker-${i}`;
+      nameSpan.textContent = label;
+      row.appendChild(colorInput);
+      row.appendChild(keyInput);
+      row.appendChild(nameSpan);
+      container.appendChild(row);
+    }
+    // Prev-different-speaker key row
+    const prevRow = document.createElement('div');
+    prevRow.className = 'color-picker-row';
+    prevRow.style.marginTop = '6px';
+    const prevSpacer = document.createElement('span');
+    prevSpacer.style.width = '26px';
+    prevSpacer.style.flexShrink = '0';
+    const prevKeyInput = document.createElement('input');
+    prevKeyInput.type = 'text';
+    prevKeyInput.className = 'key-input';
+    prevKeyInput.value = prevSpeakerKey;
+    prevKeyInput.addEventListener('keydown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') { prevKeyInput.blur(); return; }
+      if (e.key.length === 1) {
+        prevSpeakerKey = e.key;
+        prevKeyInput.value = e.key;
+        localStorage.setItem('prevSpeakerKey', prevSpeakerKey);
+      }
+    });
+    const prevLabel = document.createElement('span');
+    prevLabel.textContent = 'Prev. different speaker';
+    prevRow.appendChild(prevSpacer);
+    prevRow.appendChild(prevKeyInput);
+    prevRow.appendChild(prevLabel);
+    container.appendChild(prevRow);
+
+  }
+
+  settingsBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const opening = settingsPopup.style.display !== 'block';
+    settingsPopup.style.display = opening ? 'block' : 'none';
+    if (opening) renderSpeakerColorPickers();
+  });
+
+  document.getElementById('reset-all-settings').addEventListener('click', e => {
+    e.stopPropagation();
+    updateScrollDelay(200);
+    updatePollInterval(150);
+    updateScrollDurationNear(800);
+    updateScrollDurationFar(300);
+    updateScrollDistanceCutoff(300);
+    updateSloMoRate(DEFAULT_SLOMO_RATE);
+    slowMoKey = DEFAULT_SLOMO_KEY;
+    slomoKeyInput.value = slowMoKey;
+    localStorage.setItem('slowMoKey', slowMoKey);
+    speakerColors  = [...DEFAULT_SPEAKER_COLORS];
+    speakerKeys    = [...DEFAULT_SPEAKER_KEYS];
+    prevSpeakerKey = DEFAULT_PREV_SPEAKER_KEY;
+    localStorage.removeItem('speakerColors');
+    localStorage.removeItem('speakerKeys');
+    localStorage.removeItem('prevSpeakerKey');
+    applySpeakerColors();
+    renderSpeakerColorPickers();
+  });
+
+  scrollSlider.addEventListener('input', () => updateScrollDelay(parseInt(scrollSlider.value, 10)));
+
+  document.addEventListener('click', e => {
+    if (!settingsPopup.contains(e.target) && e.target !== settingsBtn) {
+      settingsPopup.style.display = 'none';
+    }
+  });
+
+  function setTitleVersion(version) {
+    document.getElementById('version-badge').textContent = version != null ? `v${version}` : '';
+  }
+
+  function loadTranscript(data, version = null, versionUid = null, speakers = [], isComplete = false) {
+    updateSpeakers(speakers);
+    transcriptData = data;
+    captions = data.captions;
+    applyBracketedNameOverrides();
+    buildSpeakerMap();
+    activeIndex = -1;
+    unsavedChanges = false;
+    undoStack = [];
+    redoStack = [];
+    updateUndoButtons();
+    currentVersionUid = versionUid;
+
+    // Reset done button state for the newly loaded episode
+    const doneBtn = document.getElementById('done-btn');
+    if (isComplete) {
+      doneBtn.textContent = 'Done ✓';
+      doneBtn.style.borderColor = '#4caf50';
+      doneBtn.style.color = '#4caf50';
+      doneBtn.disabled = true;
+    } else {
+      doneBtn.textContent = "I'm Done!";
+      doneBtn.style.borderColor = '';
+      doneBtn.style.color = '';
+      doneBtn.disabled = false;
+    }
+
+    // Sync episode dropdown and version badge
+    if (versionUid) document.getElementById('episode-select').value = versionUid;
+    document.getElementById('version-badge').textContent = version != null ? `v${version}` : '';
+    document.title = decodeHtml(data.title || data.id);
+
+    // Show app
+    document.getElementById('load-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    // Render transcript
+    renderTranscript();
+
+    // Detect user scrolling to pause auto-scroll briefly
+    const scrollEl = document.getElementById('transcript-scroll');
+    scrollEl.addEventListener('wheel', () => {
+      userScrolling = true;
+      clearTimeout(userScrollTimer);
+      userScrollTimer = setTimeout(() => { userScrolling = false; }, USER_SCROLL_TIMEOUT_MS);
+    }, { passive: true });
+
+    // Init YouTube player
+    if (ytPlayer) {
+      try { ytPlayer.destroy(); } catch {}
+      ytPlayer = null;
+    }
+    clearInterval(pollInterval);
+
+    // Re-create player div (destroyed by YouTube SDK on destroy)
+    const container = document.getElementById('player-container');
+    container.innerHTML = '<div id="player"></div>';
+
+    const lastModified = [...captions].reverse().find(c => c.modified);
+    const seekSeconds = lastModified ? parseStart(lastModified.start) : null;
+    initPlayer(data.id, seekSeconds);
+  }
+</script>
+</body>
+</html>

@@ -123,6 +123,7 @@ try:
         user_uid    = str(data.pop("user_uid",    "") or "").strip() or None
         is_complete = bool(data.pop("is_complete", False))
         wants_more  = bool(data.pop("wants_more",  False))
+        app_version = str(data.pop("app_version",   "") or "").strip() or None
         data.pop("speakers", None)
 
         if not valid_id(video_id):
@@ -137,7 +138,7 @@ try:
         Path(rel_path).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
         try:
-            new_version = insert_version(video_id, rel_path, user_uid)
+            new_version = insert_version(video_id, rel_path, user_uid, app_version=app_version)
             if is_complete and user_uid:
                 set_episode_complete(video_id, user_uid)
             if wants_more and user_uid:

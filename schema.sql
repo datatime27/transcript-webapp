@@ -59,6 +59,7 @@ CREATE TABLE versions (
     version_number INT          NOT NULL,
     filepath       VARCHAR(500) NOT NULL,
     user_uid       VARCHAR(8),
+    app_version     VARCHAR(50)  DEFAULT NULL,
     created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_merged       TINYINT(1)   DEFAULT NULL,
     PRIMARY KEY (uid),
