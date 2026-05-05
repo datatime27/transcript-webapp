@@ -40,7 +40,7 @@ python preprocess.py <video_id> --drift 2
 | `video_id` | required | YouTube video ID, used to derive all filenames |
 | `--drift` | `0.0` | Seconds the JSON timecodes have drifted by end of file. Applies a linear multiplier: `(final_time - drift) / final_time`. Ignored when `--transcribe` is set. |
 | `--trim` | `60:00` | Discard captions with start time ≥ this value. Format: `MM:SS` or `HH:MM:SS`. |
-| `--transcribe` | off | Transcribe the MP3 using WhisperX instead of loading a JSON transcript. Output JSON gets `title: ""`. |
+| `--transcribe` | off | Transcribe the MP3 using WhisperX instead of using the JSON captions. The JSON file is still loaded for its metadata (title, id, etc.); only the `captions` array is discarded and replaced with Whisper output. |
 | `--model` | `large-v2` | WhisperX Whisper model to use when `--transcribe` is set. |
 
 ## Pipeline
@@ -49,7 +49,7 @@ python preprocess.py <video_id> --drift 2
 
 **Without `--transcribe`:** loads the manual YouTube transcript JSON, preprocesses captions (split multi-speaker, split sentences, normalise sound effects), applies trim and drift correction, converts to WhisperX segment format.
 
-**With `--transcribe`:** loads the Whisper model, transcribes the audio, then runs `whisperx.load_align_model()` + `whisperx.align()` to refine segment timestamps to word level. `load_align_model` downloads a language-specific wav2vec2 forced-alignment model (e.g. `jonatasgrosman/wav2vec2-large-xlsr-53-english`); word-level timestamps improve speaker assignment accuracy because diarization segments have sub-second resolution. Trim is applied after speaker assignment.
+**With `--transcribe`:** loads the JSON file for metadata (title, id, any top-level fields) but discards its `captions` array. Then loads the Whisper model, transcribes the audio, and runs `whisperx.load_align_model()` + `whisperx.align()` to refine segment timestamps to word level. `load_align_model` downloads a language-specific wav2vec2 forced-alignment model (e.g. `jonatasgrosman/wav2vec2-large-xlsr-53-english`); word-level timestamps improve speaker assignment accuracy because diarization segments have sub-second resolution. Trim is applied after speaker assignment.
 
 ### Step 2 — Diarize
 - Loads audio with `whisperx.load_audio()`
