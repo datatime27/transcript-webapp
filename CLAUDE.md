@@ -140,8 +140,10 @@ Beta version of the viewer at `viewer-beta.html?user={uid}`. Shares the same bac
 **Additional caption editing controls** (always visible, per caption line):
 - **× (delete)** — removes the caption from the array.
 - **+ (insert)** — inserts a new blank caption below; start time is midpoint between surrounding captions (or `prev_start + prev_duration` at the end); duration spans to the next caption; speaker copied from the caption above; new caption auto-focuses for immediate text entry.
-- **✂ (split)** — visible only while a caption is in text edit mode (double-click to enter). Click ✂ to split at the current cursor position; text is divided at that character offset, duration split proportionally, right half gets a fresh `start = left_start + left_duration`.
+- **✂ (split)** — visible only while a caption is in text edit mode (double-click to enter, or press Enter on the active caption). Click ✂ to split at the current cursor position; text is divided at that character offset, duration split proportionally, right half gets a fresh `start = left_start + left_duration`.
 - **Timecode editing** — double-click the timecode to edit it inline. Accepts `MM:SS`, `H:MM:SS`, or bare seconds. On commit, the captions array is re-sorted by start time.
+
+**Text edit mode** — shared `enterEditMode(textSpan)` helper pauses video, sets `contentEditable='true'` on the span, shows the ✂ button (found via `closest('.caption-line').querySelector('.caption-split-btn')`), and focuses. Called by the dblclick handler on `.caption-text` and by the global Enter key handler (which targets the active caption).
 
 **Undo / redo** — `undoStack` and `redoStack` hold deep-copied snapshots of `captions` (max 50 entries). `pushUndo()` is called before every mutation: delete, insert, split, speaker change (`setSpeaker`), text edit commit, start time edit commit. `reRender()` is called by both `undo()` and `redo()` after swapping the snapshot. Stacks cleared on episode load. Keyboard: Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo (ignored when a `contentEditable` element is focused). ↺/↻ buttons in the header mirror the keyboard shortcuts and are disabled when their stack is empty.
 
