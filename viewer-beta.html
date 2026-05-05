@@ -809,7 +809,7 @@
     <div class="help-section">
       <h3>Editing caption text</h3>
       <ul>
-        <li><strong>Double-click any caption text</strong> to enter inline edit mode. The video pauses automatically.</li>
+        <li><strong>Double-click any caption text</strong> (or press <span class="help-key">Enter</span> on the active caption) to enter inline edit mode. The video pauses automatically.</li>
         <li><span class="help-key">Enter</span> or clicking away commits the edit.</li>
         <li><span class="help-key">Escape</span> reverts the caption to its original text.</li>
       </ul>
@@ -1276,6 +1276,13 @@
         badge.textContent = isSloMo ? `${slowMoRate}x` : '';
         badge.style.display = isSloMo ? '' : 'none';
       }
+    } else if (e.key === 'Enter') {
+      const activeLine = document.querySelector('.caption-line.active');
+      const textSpan = activeLine && activeLine.querySelector('.caption-text');
+      if (textSpan && textSpan.contentEditable !== 'true') {
+        e.preventDefault();
+        enterEditMode(textSpan);
+      }
     }
   });
 
@@ -1410,6 +1417,14 @@
       .forEach(el => el.classList.remove('selected'));
   }
 
+  function enterEditMode(textSpan) {
+    if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+    textSpan.contentEditable = 'true';
+    const sb = textSpan.closest('.caption-line').querySelector('.caption-split-btn');
+    if (sb) sb.style.display = 'inline-block';
+    textSpan.focus();
+  }
+
   function renderTranscript() {
     const container = document.getElementById('transcript-scroll');
     container.innerHTML = '';
@@ -1480,10 +1495,7 @@
 
         textSpan.addEventListener('dblclick', e => {
           e.stopPropagation();
-          if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
-          textSpan.contentEditable = 'true';
-          if (splitBtn) splitBtn.style.display = 'inline-block';
-          textSpan.focus();
+          enterEditMode(textSpan);
         });
 
         textSpan.addEventListener('blur', () => {
