@@ -59,7 +59,7 @@ python preprocess.py <video_id> --drift 2
 ### Step 3 — Assign speakers
 - Calls `whisperx.assign_word_speakers(diarize_segments, transcript_result)` to match diarization speaker labels to caption segments
 - Pure sound effect captions (entirely in brackets e.g. `[laughter]`) are labelled `Other` regardless of diarization output
-- With `--transcribe`, captions are built directly from the resulting segments (text, start, duration, speaker)
+- With `--transcribe`, captions are built directly from the resulting segments (text, start, duration, speaker), then `normalize_soundeffect_captions` is applied to bracket any unbracketed all-caps sound effects (e.g. `LAUGHTER Who's next?` → `[LAUGHTER] Who's next?`). Any caption whose full text is `[...]` is then labelled `Other`.
 
 ### Step 4 — Write output
 - Writes human-readable `tmp-outputs/{video_id}-aligned.txt`

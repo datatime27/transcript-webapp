@@ -13,6 +13,7 @@ import re
 from caption_utils import (
     format_caption_text,
     preprocess_captions,
+    normalize_soundeffect_captions,
     captions_to_whisperx_segments,
     write_txt,
 )
@@ -177,6 +178,11 @@ if args.transcribe:
         if re.fullmatch(r'\[.*\]', text):
             speaker = 'Other'
         captions.append({'text': text, 'start': start, 'duration': duration, 'speaker': speaker})
+
+    captions = normalize_soundeffect_captions(captions)
+    for cap in captions:
+        if re.fullmatch(r'\[.*\]', cap['text']):
+            cap['speaker'] = 'Other'
 
     before   = len(captions)
     captions = [c for c in captions if c['start'] < trim_seconds]
