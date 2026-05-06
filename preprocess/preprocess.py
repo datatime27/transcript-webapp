@@ -66,7 +66,7 @@ AUDIO_FILE        = f"audio/{VIDEO_ID}.mp3"
 JSON_FILE         = f"C:\\Peter\\Software\\data-time-repos\\word-tracker\\transcripts\\taskmaster\\{VIDEO_ID}.json"
 
 # Validate input files exist before doing any heavy work
-if not args.transcribe and not os.path.exists(JSON_FILE):
+if not os.path.exists(JSON_FILE):
     parser.error(f"JSON transcript not found: {JSON_FILE}")
 if not os.path.exists(AUDIO_FILE):
     parser.error(f"Audio file not found: {AUDIO_FILE}")
@@ -87,7 +87,7 @@ MAX_SPEAKERS      = 9         # In case of extra voices
 # ─────────────────────────────────────────────
 # STEP 1 — LOAD AND PREPARE CAPTIONS
 # ─────────────────────────────────────────────
-print("\nLoading audio...")
+print(f"\nLoading audio... {AUDIO_FILE}")
 audio = whisperx.load_audio(AUDIO_FILE)
 
 if args.transcribe:
@@ -106,7 +106,8 @@ if args.transcribe:
     )
     print(f"  Aligned {len(aligned_result['segments'])} segments")
 
-    data = {'id': VIDEO_ID, 'title': '', 'captions': []}
+    with open(JSON_FILE, encoding='utf-8') as f:
+        data = json.load(f)
     transcript_result = aligned_result
 else:
     print("Loading JSON transcript...")

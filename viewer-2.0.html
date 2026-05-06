@@ -816,6 +816,26 @@
     </div>
 
     <div class="help-section">
+      <h3>Editing caption structure</h3>
+      <ul>
+        <li><strong>× (delete)</strong> — removes the caption entirely.</li>
+        <li><strong>+ (insert)</strong> — inserts a new blank caption below. The start time is set to the midpoint between that caption and the next; the speaker is copied from above. The new caption is automatically focused so you can start typing immediately.</li>
+        <li><strong>✂ (split)</strong> — only visible while a caption is in text edit mode. Splits the caption at the current cursor position: text is divided at that point, duration is split proportionally, and the right half gets a new start time immediately after the left half ends.</li>
+        <li><strong>Double-click a timecode</strong> to edit it inline. Accepts <strong>MM:SS</strong>, <strong>H:MM:SS</strong>, or bare seconds. The transcript re-sorts automatically on commit.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Undo / redo</h3>
+      <ul>
+        <li><span class="help-key">Ctrl</span>+<span class="help-key">Z</span> undo, <span class="help-key">Ctrl</span>+<span class="help-key">Y</span> / <span class="help-key">Ctrl</span>+<span class="help-key">Shift</span>+<span class="help-key">Z</span> redo.</li>
+        <li>The ↺ and ↻ buttons in the header do the same thing and are greyed out when there is nothing to undo or redo.</li>
+        <li>Up to 50 steps are remembered. The history is cleared when you switch episodes.</li>
+        <li>Undo and redo shortcuts are disabled while editing caption text so they don't conflict with your browser's own undo.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
       <h3>Slow motion</h3>
       <ul>
         <li>Press <span class="help-key">/</span> (configurable in Settings) to toggle slow-motion playback. A speed badge appears in the header while active.</li>
@@ -827,7 +847,7 @@
       <h3>Saving</h3>
       <ul>
         <li>Click <strong>Save</strong> (top-right) to save your progress. Each save creates a new version.</li>
-        <li>There is no undo — double-check before using the Apply to all feature.</li>
+        <li>Double-check before using the Apply to all feature — it cannot be undone.</li>
         <li>You can switch episodes from the dropdown in the header; you'll be warned if there are unsaved changes.</li>
         <li>Click <strong>I'm Done!</strong> when you've finished the episode. You can also indicate you're ready for a new episode at that point.</li>
       </ul>
@@ -1083,6 +1103,12 @@
     updateUndoButtons();
   }
 
+  function markModified(cap) {
+    cap.modified = true;
+    if (!cap.modification_history) cap.modification_history = [];
+    if (!cap.modification_history.includes(userUid)) cap.modification_history.push(userUid);
+  }
+
   // ── Edit mode operations ───────────────────────────────────────────────────
   function parseTimeInput(str) {
     str = String(str).trim();
@@ -1139,7 +1165,7 @@
     const insertAt = Math.max(0, afterIndex + 1);
     const templateSpeaker = afterIndex >= 0 ? captions[afterIndex].speaker : (captions[0] && captions[0].speaker) || 'UNKNOWN';
     pushUndo();
-    captions.splice(insertAt, 0, { text: '', start: newStart, duration: newDuration, speaker: templateSpeaker, modified: false });
+    captions.splice(insertAt, 0, { text: '', start: newStart, duration: newDuration, speaker: templateSpeaker, modified: true, modification_history: [userUid] });
     unsavedChanges = true;
     buildSpeakerMap();
     activeIndex = -1;
@@ -1169,10 +1195,12 @@
     const totalDur = typeof cap.duration === 'number' ? cap.duration : 1;
     const ratio = fullText.length > 0 ? charOffset / fullText.length : 0.5;
     const leftDur = totalDur * ratio;
+    const splitHistory = [...(cap.modification_history || [])];
+    if (!splitHistory.includes(userUid)) splitHistory.push(userUid);
     pushUndo();
     captions.splice(i, 1,
-      { ...cap, text: leftText, duration: leftDur },
-      { ...cap, text: rightText, start: startVal + leftDur, duration: totalDur - leftDur, modified: false }
+      { ...cap, text: leftText, duration: leftDur, modified: true, modification_history: splitHistory },
+      { ...cap, text: rightText, start: startVal + leftDur, duration: totalDur - leftDur, modified: true, modification_history: splitHistory }
     );
     unsavedChanges = true;
     reRender();
@@ -1302,7 +1330,7 @@
     indices.forEach(i => {
       const wasAutoAssigned = (captions[i].speaker || '').startsWith('SPEAKER_');
       captions[i].speaker = newSpeaker;
-      if (!wasAutoAssigned) captions[i].modified = true;
+      if (!wasAutoAssigned) markModified(captions[i]);
     });
     unsavedChanges = true;
     buildSpeakerMap();
@@ -1411,18 +1439,18 @@
     document.addEventListener('mouseup', onMouseUp);
   });
 
-  // ── Transcript rendering ───────────────────────────────────────────────────
-  function clearSelected() {
-    document.querySelectorAll('.caption-line.selected')
-      .forEach(el => el.classList.remove('selected'));
-  }
-
   function enterEditMode(textSpan) {
     if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
     textSpan.contentEditable = 'true';
     const sb = textSpan.closest('.caption-line').querySelector('.caption-split-btn');
     if (sb) sb.style.display = 'inline-block';
     textSpan.focus();
+  }
+
+  // ── Transcript rendering ───────────────────────────────────────────────────
+  function clearSelected() {
+    document.querySelectorAll('.caption-line.selected')
+      .forEach(el => el.classList.remove('selected'));
   }
 
   function renderTranscript() {
@@ -1505,9 +1533,9 @@
           if (newText !== captions[i].text) {
             pushUndo();
             captions[i].text = newText;
-            captions[i].modified = true;
+            markModified(captions[i]);
             unsavedChanges = true;
-            line.classList.toggle('modified', !!captions[i].modified);
+            line.classList.add('modified');
           }
         });
 
@@ -1548,6 +1576,7 @@
             if (!isNaN(newSeconds) && newSeconds >= 0 && newSeconds !== start) {
               pushUndo();
               captions[i].start = newSeconds;
+              markModified(captions[i]);
               captions.sort((a, b) => parseStart(a.start) - parseStart(b.start));
               unsavedChanges = true;
               reRender();
@@ -1805,7 +1834,7 @@
   }
 
   async function fetchAndLoad(versionUid, version, isComplete = false) {
-    const res = await fetch(`./transcripts.py?version=${versionUid}`);
+    const res = await fetch(`./transcripts.py?version=${versionUid}&user=${encodeURIComponent(userUid)}`);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
     loadTranscript(data, version, versionUid, data.speakers || [], isComplete);

@@ -55,7 +55,7 @@ try:
                 body   = json.dumps({"error": "Invalid version id"})
                 return
             try:
-                filepath, speakers = get_version(version_uid)
+                filepath, speakers, version_user_uid = get_version(version_uid)
             except ValueError as e:
                 status = "404 Not Found"
                 body   = json.dumps({"error": str(e)})
@@ -67,6 +67,12 @@ try:
                 return
             data = json.loads(path.read_text(encoding="utf-8"))
             data["speakers"] = speakers
+            # For 2.0 review workflow: if a different user is loading this version,
+            # reset modified:false so only the current user's changes are highlighted.
+            requesting_user_uid = params.get("user", [""])[0] or None
+            if requesting_user_uid and version_user_uid and requesting_user_uid != version_user_uid:
+                for cap in data.get("captions", []):
+                    cap["modified"] = False
             body = json.dumps(data, ensure_ascii=False)
 
         # Fetch the list of episodes assigned to a user

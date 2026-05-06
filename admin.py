@@ -30,7 +30,8 @@ from db import (
     get_wants_more_suggestions,
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
     get_user_info, get_episode_info, get_user_episode_count,
-    set_season_speakers, set_season_complete, set_location_season, update_user_location,
+    set_season_speakers, set_season_complete,
+    set_location_season, update_user_location,
     get_reapply_data, get_user_latency,
 )
 from annotation_utils import apply_annotations
@@ -243,12 +244,15 @@ def action_add_episode_to_user(data):
         return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
     try:
         add_episode_to_user(user_uid, episode_uid)
+    except ValueError as e:
+        return "409 Conflict", json.dumps({"error": str(e)})
+    try:
         user          = get_user_info(user_uid)
         episode       = get_episode_info(episode_uid)
         episode_count = get_user_episode_count(user_uid)
         if user and episode:
             label    = f"{episode['show_name']} S{episode['season_number']}E{episode['episode_number']}"
-            base_url = f"https://itsdatatime.com/transcript-webapp/viewer.html?user={user_uid}"
+            base_url = f"https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user={user_uid}"
             if episode_count == 1:
                 viewer_url = base_url
                 send_email(
@@ -280,6 +284,7 @@ def action_set_season_complete(data):
         return "200 OK", json.dumps({"ok": True})
     except ValueError as e:
         return "404 Not Found", json.dumps({"error": str(e)})
+
 
 
 def action_set_location_season(data):
@@ -326,14 +331,14 @@ def action_update_user_location(data):
 
 
 POST_ACTIONS = {
-    "delete_test_accounts":   action_delete_test_accounts,
-    "create_user":            action_create_user,
-    "populate_transcript":    action_populate_transcript,
-    "add_episode_to_user":    action_add_episode_to_user,
-    "set_season_speakers":    action_set_season_speakers,
-    "set_season_complete":    action_set_season_complete,
-    "set_location_season":    action_set_location_season,
-    "update_user_location":   action_update_user_location,
+    "delete_test_accounts":    action_delete_test_accounts,
+    "create_user":             action_create_user,
+    "populate_transcript":     action_populate_transcript,
+    "add_episode_to_user":     action_add_episode_to_user,
+    "set_season_speakers":     action_set_season_speakers,
+    "set_season_complete":     action_set_season_complete,
+    "set_location_season":     action_set_location_season,
+    "update_user_location":    action_update_user_location,
 }
 
 status = "200 OK"

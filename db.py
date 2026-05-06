@@ -140,7 +140,8 @@ def get_episodes_with_user_versions():
                       s.name, season.number, e.number, u.is_admin, u.is_test_account,
                       (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid),
                       season.is_complete, ue.is_complete, u.is_anonymous,
-                      MAX(v.created_at), ue.created_at, season.uid
+                      MAX(v.created_at), ue.created_at, season.uid,
+                      (SELECT app_version FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1)
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -155,27 +156,28 @@ def get_episodes_with_user_versions():
             ep_uid = row[0]
             if ep_uid not in episodes:
                 episodes[ep_uid] = {
-                    "episode_uid":     ep_uid,
-                    "youtube_id":      row[2],
-                    "show_name":       row[7],
-                    "season_number":   row[8],
-                    "episode_number":  row[9],
-                    "has_merged":      bool(row[12]),
-                    "season_complete": bool(row[13]),
-                    "season_uid":      row[18],
-                    "users":           [],
+                    "episode_uid":       ep_uid,
+                    "youtube_id":        row[2],
+                    "show_name":         row[7],
+                    "season_number":     row[8],
+                    "episode_number":    row[9],
+                    "has_merged":        bool(row[12]),
+                    "season_complete":   bool(row[13]),
+                    "season_uid":        row[18],
+                    "users":             [],
                 }
             if row[3] is not None:
                 episodes[ep_uid]["users"].append({
-                    "user_name":        row[3],
-                    "user_uid":         row[4],
-                    "version_number":   row[5],  # NULL = allocated but not started
-                    "version_uid":      row[6],   # NULL if not started
-                    "is_admin":         bool(row[10]),
-                    "is_test_account":  bool(row[11]),
-                    "is_complete":         bool(row[14]),
-                    "is_anonymous":        bool(row[15]),
-                    "version_created_at":  (row[16] or row[17]).replace(tzinfo=_EASTERN).isoformat() if (row[16] or row[17]) else None,
+                    "user_name":          row[3],
+                    "user_uid":           row[4],
+                    "version_number":     row[5],  # NULL = allocated but not started
+                    "version_uid":        row[6],  # NULL if not started
+                    "is_admin":           bool(row[10]),
+                    "is_test_account":    bool(row[11]),
+                    "is_complete":        bool(row[14]),
+                    "is_anonymous":       bool(row[15]),
+                    "version_created_at": (row[16] or row[17]).replace(tzinfo=_EASTERN).isoformat() if (row[16] or row[17]) else None,
+                    "latest_app_version": row[19],
                 })
         for ep in episodes.values():
             ep["users"].sort(key=lambda u: (u["version_uid"] is not None, u["user_name"]))
@@ -343,10 +345,29 @@ def get_all_episodes():
 
 
 def add_episode_to_user(user_uid, episode_uid):
-    """Assign an episode to a user by UID and clear their wants_more flag."""
+    """Assign an episode to a user by UID and clear their wants_more flag.
+
+    Raises ValueError if the episode is in v2.0 mode (has a completed v2.0 version)
+    and another user has an active non-complete assignment.
+    """
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        cur.execute(
+            """SELECT COUNT(*) FROM user_episodes ue_active
+               WHERE ue_active.episode_uid = %s
+                 AND COALESCE(ue_active.is_complete, 0) = 0
+                 AND EXISTS (
+                   SELECT 1 FROM versions v
+                   JOIN user_episodes ue_done ON ue_done.episode_uid = v.episode_uid AND ue_done.user_uid = v.user_uid
+                   WHERE v.episode_uid = %s
+                     AND v.app_version = '2.0'
+                     AND ue_done.is_complete = 1
+                 )""",
+            (episode_uid, episode_uid),
+        )
+        if cur.fetchone()[0] > 0:
+            raise ValueError("This episode is currently locked — wait for the active reviewer to finish before assigning.")
         cur.execute(
             "INSERT IGNORE INTO user_episodes (user_uid, episode_uid) VALUES (%s, %s)",
             (user_uid, episode_uid),
@@ -425,8 +446,8 @@ def get_speakers_for_episode(episode_uid):
 
 def get_episodes_for_user(user_uid):
     """
-    Return a list of {version_id, title, version, episode_uid} dicts for episodes assigned to the given user.
-    'version_id' is the uid of the latest version for each episode.
+    Return a list of {version_id, title, version, episode_uid, is_complete} dicts for episodes assigned to the given user.
+    For v2.0 episodes, falls back to the latest completed v2.0 version from another user before the original base.
     """
     conn = get_db_connection()
     try:
@@ -435,12 +456,13 @@ def get_episodes_for_user(user_uid):
             """SELECT e.title, v.uid, v.version_number, e.uid, ue.is_complete
                FROM episodes e
                JOIN user_episodes ue ON ue.episode_uid = e.uid
-               JOIN versions v ON v.uid = COALESCE(
-                 (SELECT uid FROM versions WHERE episode_uid = e.uid AND user_uid = ue.user_uid ORDER BY version_number DESC LIMIT 1),
-                 (SELECT uid FROM versions WHERE episode_uid = e.uid AND user_uid IS NULL    ORDER BY version_number DESC LIMIT 1)
-               )
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
+               JOIN versions v ON v.uid = COALESCE(
+                 (SELECT uid FROM versions WHERE episode_uid = e.uid AND user_uid = ue.user_uid ORDER BY version_number DESC LIMIT 1),
+                 (SELECT v_rev.uid FROM versions v_rev JOIN user_episodes ue_rev ON ue_rev.episode_uid = v_rev.episode_uid AND ue_rev.user_uid = v_rev.user_uid WHERE v_rev.episode_uid = e.uid AND v_rev.user_uid != ue.user_uid AND v_rev.app_version = '2.0' AND ue_rev.is_complete = 1 ORDER BY v_rev.version_number DESC LIMIT 1),
+                 (SELECT uid FROM versions WHERE episode_uid = e.uid AND user_uid IS NULL    ORDER BY version_number DESC LIMIT 1)
+               )
                WHERE ue.user_uid = %s AND IFNULL(season.is_complete, 0) = 0
                ORDER BY s.name, season.number, e.number""",
             (user_uid,),
@@ -454,16 +476,16 @@ def get_episodes_for_user(user_uid):
 
 
 def get_version(version_uid):
-    """Return (filepath, speakers) for the given version uid."""
+    """Return (filepath, speakers, user_uid) for the given version uid."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT filepath, episode_uid FROM versions WHERE uid = %s", (version_uid,))
+        cur.execute("SELECT filepath, episode_uid, user_uid FROM versions WHERE uid = %s", (version_uid,))
         row = cur.fetchone()
         if not row:
             raise ValueError(f"No version found with uid: {version_uid}")
-        filepath, episode_uid = row
-        return filepath, _get_speakers(cur, episode_uid)
+        filepath, episode_uid, version_user_uid = row
+        return filepath, _get_speakers(cur, episode_uid), version_user_uid
     finally:
         conn.close()
 
@@ -694,6 +716,7 @@ def set_season_complete(season_uid, is_complete):
         conn.close()
 
 
+
 def get_wants_more_suggestions():
     """For each user with wants_more=1, return the best next episode to assign.
 
@@ -747,6 +770,20 @@ def get_wants_more_suggestions():
                     AND IFNULL(users.is_admin, 0) = 0
                     AND IFNULL(users.is_test_account, 0) = 0
                 WHERE episodes.season_uid IN ({placeholders})
+                  AND (
+                    NOT EXISTS (
+                      SELECT 1 FROM versions v_chk
+                      JOIN user_episodes ue_chk ON ue_chk.episode_uid = v_chk.episode_uid AND ue_chk.user_uid = v_chk.user_uid
+                      WHERE v_chk.episode_uid = episodes.uid
+                        AND v_chk.app_version = '2.0'
+                        AND ue_chk.is_complete = 1
+                    )
+                    OR NOT EXISTS (
+                      SELECT 1 FROM user_episodes ue_lock
+                      WHERE ue_lock.episode_uid = episodes.uid
+                        AND COALESCE(ue_lock.is_complete, 0) = 0
+                    )
+                  )
                 GROUP BY episodes.season_uid, episodes.uid, shows.name, seasons.number, episodes.number
                 HAVING cnt < 4
                 ORDER BY episodes.season_uid, cnt ASC, episodes.number ASC

@@ -340,6 +340,20 @@
     }
     a.episode-user-tag.unstarted:hover { background: #6a2020; }
 
+    .episode-user-tag.ready-review, a.episode-user-tag.ready-review:visited {
+      border-color: #00ccaa;
+      box-shadow: 0 0 5px #00ccaa55;
+    }
+
+    .lock-badge {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 0.72rem;
+      color: #ff9944;
+      font-weight: 600;
+      vertical-align: middle;
+    }
+
     .episode-user-tag.has-altered-cc { border-color: #cc6600 !important; }
     .altered-count {
       display: inline-block;
@@ -584,6 +598,7 @@ Alex Horne</textarea>
     }
 
     let allUsers              = [];
+    let allEpisodes           = [];
     let selectedUserUid       = null;
     let allEpisodesWithUsers  = [];
     let userSortKey           = null;
@@ -598,6 +613,7 @@ Alex Horne</textarea>
         return;
       }
       allUsers = data.users;
+      allEpisodes = data.episodes;
       allEpisodesWithUsers = data.episodes_with_user_versions;
       wantsMoreSuggestions = data.wants_more_suggestions || {};
       renderRecentVersions(data.recent_versions);
@@ -627,7 +643,7 @@ Alex Horne</textarea>
         const statusStr = r.version_count === 0 ? '<span style="color:#888;font-style:italic">Not started</span>' : `v${r.version_count}`;
         const modStr = r.latest_modification != null ? r.latest_modification : '<span style="color:#555">—</span>';
         const pctStr = r.percent_modified != null ? `${r.percent_modified}%` : '<span style="color:#555">—</span>';
-        const link = `viewer.html?user=${r.user_uid}&episode=${r.episode_uid}`;
+        const link = `viewer-2.0.html?user=${r.user_uid}&episode=${r.episode_uid}`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><a href="${link}" class="link-user">${escHtml(r.user_name)}</a></td>
@@ -735,6 +751,7 @@ Alex Horne</textarea>
     }
 
     function renderEpisodeRow(ep) {
+      const isLocked = ep.users.some(u => u.is_complete && u.latest_app_version === '2.0') && ep.users.some(u => !u.is_complete);
       const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
       const users = visibleUsers.length
         ? visibleUsers.slice().sort((a, b) => {
@@ -742,8 +759,9 @@ Alex Horne</textarea>
             const tb = b.version_created_at ? new Date(b.version_created_at).getTime() : 0;
             return ta - tb;
           }).map(u => {
-            const cls     = u.version_number == null ? 'episode-user-tag unstarted'
-                          : u.is_complete             ? 'episode-user-tag completed'
+            const isReady = u.is_complete && u.latest_app_version === '2.0';
+            let cls       = u.version_number == null ? 'episode-user-tag unstarted'
+                          : u.is_complete             ? 'episode-user-tag completed' + (isReady ? ' ready-review' : '')
                           :                             'episode-user-tag';
             const version = u.version_number != null ? ` v${u.version_number}` : '';
             const dateStr = u.version_created_at
@@ -751,13 +769,14 @@ Alex Horne</textarea>
               : '';
             const href    = u.version_uid
               ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
-              : `viewer.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
+              : `viewer-2.0.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
             const versionAttr = u.version_uid ? ` data-version-uid="${escHtml(u.version_uid)}"` : '';
             return `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
+      const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
       return `<div class="episode-row${ep.has_merged ? ' merged' : ''}">
-        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">${escHtml(ep.show_name || '—')} S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button></div>
+        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">${escHtml(ep.show_name || '—')} S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${lockBadge}</div>
         <div class="episode-users">${users}</div>
       </div>`;
     }
@@ -776,8 +795,8 @@ Alex Horne</textarea>
           const seasonKey = `${ep.show_name}|${ep.season_number}`;
           if (seasonKey !== lastSeason) {
             const isComplete = ep.season_complete;
-            const btnLabel = isComplete ? 'Mark active' : 'Mark complete';
-            const btnStyle = isComplete
+            const btnLabel   = isComplete ? 'Mark active' : 'Mark complete';
+            const btnStyle   = isComplete
               ? 'background:#1a4d22;color:#9ee8a0;border-color:#276630'
               : 'background:#4d1a1a;color:#e89e9e;border-color:#663030';
             parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.7rem;${btnStyle}" onclick="setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div>`);
@@ -837,7 +856,7 @@ Alex Horne</textarea>
       const tbody = document.getElementById('recent-tbody');
       tbody.innerHTML = versions.map(v =>
         `<tr>
-          <td><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(v.user_uid)}" target="_blank" class="link-user">${escHtml(v.user_name || '—')}</a></td>
+          <td><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(v.user_uid)}" target="_blank" class="link-user">${escHtml(v.user_name || '—')}</a></td>
           <td>${escHtml(v.show || '—')} S${v.season} E${v.episode}</td>
           <td>v${v.version_number}</td>
           <td>${v.is_complete ? '✓' : ''}</td>
@@ -970,7 +989,7 @@ Alex Horne</textarea>
           <td>${u.episodes_started ?? '—'}</td>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
           <td class="text-small">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
-          <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
+          <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
           <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
       }).join('') || '<tr><td colspan="9">No users found</td></tr>';
@@ -1008,9 +1027,21 @@ Alex Horne</textarea>
       });
     });
 
+    function getLockedEpisodeUids() {
+      const locked = new Set();
+      allEpisodesWithUsers.forEach(ep => {
+        const hasCompletedV2 = ep.users.some(u => u.is_complete && u.latest_app_version === '2.0');
+        if (hasCompletedV2 && ep.users.some(u => !u.is_complete)) {
+          locked.add(ep.episode_uid);
+        }
+      });
+      return locked;
+    }
+
     function renderEpisodeSelect(episodes) {
       const sel = document.getElementById('ae-episode');
       sel.innerHTML = '<option value="">Select an episode…</option>';
+      const locked = getLockedEpisodeUids();
       let lastSeason = null;
       let group = null;
       episodes.filter(ep => !ep.season_complete).forEach(ep => {
@@ -1023,7 +1054,9 @@ Alex Horne</textarea>
         }
         const opt = document.createElement('option');
         opt.value = ep.uid;
-        opt.textContent = `S${ep.season} E${ep.episode}`;
+        const isLocked = locked.has(ep.uid);
+        opt.textContent = `S${ep.season} E${ep.episode}${isLocked ? ' (locked)' : ''}`;
+        opt.disabled = isLocked;
         group.appendChild(opt);
       });
     }

@@ -673,7 +673,7 @@
         const data = await res.json();
         if (!res.ok) { showError(data.error); return; }
 
-        const viewerUrl = `viewer.html?user=${encodeURIComponent(data.user_uid)}&episode=${encodeURIComponent(data.episode_uid || '')}`;
+        const viewerUrl = `viewer-2.0.html?user=${encodeURIComponent(data.user_uid)}&episode=${encodeURIComponent(data.episode_uid || '')}`;
         document.getElementById('title').innerHTML =
           `<a href="${escHtml(viewerUrl)}" target="_blank" style="color:inherit;text-decoration:none;" title="Open in viewer">` +
           escHtml(decodeHtml(data.episode_title || 'Reapply')) + '</a>' +
