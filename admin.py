@@ -252,7 +252,8 @@ def action_add_episode_to_user(data):
         episode_count = get_user_episode_count(user_uid)
         if user and episode:
             label    = f"{episode['show_name']} S{episode['season_number']}E{episode['episode_number']}"
-            base_url = f"https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user={user_uid}"
+            viewer   = "viewer.html" if user.get("location") == "AU" else "viewer-2.0.html"
+            base_url = f"https://itsdatatime.com/transcript-webapp/{viewer}?user={user_uid}"
             if episode_count == 1:
                 viewer_url = base_url
                 send_email(
