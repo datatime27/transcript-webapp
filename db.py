@@ -347,8 +347,7 @@ def get_all_episodes():
 def add_episode_to_user(user_uid, episode_uid):
     """Assign an episode to a user by UID and clear their wants_more flag.
 
-    Raises ValueError if the episode is in v2.0 mode (has a completed v2.0 version)
-    and another user has an active non-complete assignment.
+    Raises ValueError if the episode has any v2.0 activity and any user has a non-complete assignment.
     """
     conn = get_db_connection()
     try:
@@ -359,15 +358,13 @@ def add_episode_to_user(user_uid, episode_uid):
                  AND COALESCE(ue_active.is_complete, 0) = 0
                  AND EXISTS (
                    SELECT 1 FROM versions v
-                   JOIN user_episodes ue_done ON ue_done.episode_uid = v.episode_uid AND ue_done.user_uid = v.user_uid
                    WHERE v.episode_uid = %s
                      AND v.app_version = '2.0'
-                     AND ue_done.is_complete = 1
                  )""",
             (episode_uid, episode_uid),
         )
         if cur.fetchone()[0] > 0:
-            raise ValueError("This episode is currently locked — wait for the active reviewer to finish before assigning.")
+            raise ValueError("This episode is currently locked — wait for all active annotators to finish before assigning.")
         cur.execute(
             "INSERT IGNORE INTO user_episodes (user_uid, episode_uid) VALUES (%s, %s)",
             (user_uid, episode_uid),
@@ -795,10 +792,8 @@ def get_wants_more_suggestions():
                   AND (
                     NOT EXISTS (
                       SELECT 1 FROM versions v_chk
-                      JOIN user_episodes ue_chk ON ue_chk.episode_uid = v_chk.episode_uid AND ue_chk.user_uid = v_chk.user_uid
                       WHERE v_chk.episode_uid = episodes.uid
                         AND v_chk.app_version = '2.0'
-                        AND ue_chk.is_complete = 1
                     )
                     OR NOT EXISTS (
                       SELECT 1 FROM user_episodes ue_lock
