@@ -100,7 +100,7 @@ def get_recent_versions():
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
                JOIN user_episodes ue ON ue.episode_uid = v.episode_uid AND ue.user_uid = v.user_uid
-               WHERE v.created_at >= NOW() - INTERVAL 7 DAY
+               WHERE v.created_at >= NOW() - INTERVAL 15 DAY
                  AND v.user_uid IS NOT NULL
                  AND v.version_number = (
                    SELECT MAX(v2.version_number) FROM versions v2

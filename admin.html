@@ -263,8 +263,11 @@
       padding: 14px 0 4px;
       border-bottom: 3px solid #00ffff;
       margin-bottom: 2px;
+      cursor: pointer;
+      user-select: none;
     }
     .season-separator:first-child { padding-top: 0; }
+    .season-toggle-arrow { margin-right: 6px; }
 
     .episode-row {
       padding: 8px 0;
@@ -405,15 +408,31 @@
     .form-row-inline { flex-direction: row; gap: 16px; }
     .form-row-inline > .form-row { flex: 1; margin-bottom: 0; }
 
+    .tab-bar { display: flex; border-bottom: 2px solid #333; margin-bottom: 20px; }
+    .tab-btn {
+      background: none; border: none; border-bottom: 3px solid transparent;
+      margin-bottom: -2px; padding: 8px 22px; color: #888;
+      font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .tab-btn.active { color: #00ffff; border-bottom-color: #00ffff; }
+    .tab-btn:hover:not(.active) { color: #ccc; }
+
   </style>
 </head>
 <body>
   <h1>Admin</h1>
   <p id="load-error"></p>
 
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="main" onclick="switchTab('main')">Main</button>
+    <button class="tab-btn" data-tab="seasons" onclick="switchTab('seasons')">Seasons</button>
+  </div>
+
+  <div id="tab-main">
   <!-- Recent activity -->
   <div class="section">
-    <h2>Recent Versions <span class="section-note">(last 7 days)</span></h2>
+    <h2>Recent Versions <span class="section-note">(last 15 days)</span></h2>
     <div class="users-table-wrap">
       <table class="users-table">
         <thead>
@@ -434,7 +453,7 @@
 
   <!-- Done per day -->
   <div class="section">
-    <h2>Versions Completed per Day <span class="section-note">(last 7 days)</span></h2>
+    <h2>Versions Completed per Day <span class="section-note">(last 15 days)</span></h2>
     <div class="users-table-wrap">
       <table class="users-table">
         <thead>
@@ -452,7 +471,7 @@
 
   <!-- Episodes -->
   <div class="section">
-    <h2>Episodes <button id="check-altered-btn" class="btn-small" style="vertical-align:middle;margin-left:8px" onclick="checkAlteredCC(this)">Check ALTERED_CC</button> <label style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle;margin-left:6px;cursor:pointer"><input type="checkbox" id="check-compare-text" style="vertical-align:middle"> Compare text</label> <span id="check-altered-status" style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle"></span></h2>
+    <h2>Episodes <button id="check-altered-btn" class="btn-small" style="vertical-align:middle;margin-left:8px" onclick="checkAlteredCC(this)">Check ALTERED_CC</button> <label style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle;margin-left:6px;cursor:pointer"><input type="checkbox" id="check-compare-text" style="vertical-align:middle"> Compare text</label> <span id="check-altered-status" style="font-size:0.78rem;color:#888;font-weight:normal;vertical-align:middle"></span> <button class="btn-small" style="vertical-align:middle;margin-left:12px" onclick="expandAllActiveSeasons()">Expand all</button></h2>
     <div id="episodes-list">
       <p>Loading…</p>
     </div>
@@ -545,37 +564,9 @@
     <div class="result" id="create-result"></div>
   </div>
 
-  <!-- Season Credits -->
-  <div class="section">
-    <h2>Season Credits</h2>
-    <div class="form-row">
-      <select id="sp-season-select" onchange="renderSeasonProgress()">
-        <option value="">Select a season…</option>
-      </select>
-    </div>
-    <textarea id="sp-output" readonly style="display:none;width:100%;font-family:monospace;font-size:0.85rem;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:5px;padding:10px 12px;resize:vertical;"></textarea>
-  </div>
+  </div><!-- /tab-main -->
 
-  <!-- Season speakers -->
-  <div class="section">
-    <h2>Season Speakers</h2>
-    <div class="form-row">
-      <label for="ss-show">Show name</label>
-      <input type="text" id="ss-show" value="Taskmaster UK" />
-    </div>
-    <div class="form-row">
-      <label for="ss-season">Season</label>
-      <input type="number" id="ss-season" min="1" value="1" />
-    </div>
-    <div class="form-row">
-      <label for="ss-speakers">Speakers <span class="section-note">(one per line, in order)</span></label>
-      <textarea id="ss-speakers" rows="8">Greg Davies
-Alex Horne</textarea>
-    </div>
-    <button class="btn" onclick="setSeasonSpeakers()">Save Speakers</button>
-    <div class="result" id="speakers-result"></div>
-  </div>
-
+  <div id="tab-seasons" style="display:none">
   <!-- Populate transcript -->
   <div class="section">
     <h2>Populate Transcript</h2>
@@ -604,7 +595,49 @@ Alex Horne</textarea>
     <div class="result" id="populate-result"></div>
   </div>
 
+  <!-- Season speakers -->
+  <div class="section">
+    <h2>Season Speakers</h2>
+    <div class="form-row">
+      <label for="ss-show">Show name</label>
+      <input type="text" id="ss-show" value="Taskmaster UK" />
+    </div>
+    <div class="form-row">
+      <label for="ss-season">Season</label>
+      <input type="number" id="ss-season" min="1" value="1" />
+    </div>
+    <div class="form-row">
+      <label for="ss-speakers">Speakers <span class="section-note">(one per line, in order)</span></label>
+      <textarea id="ss-speakers" rows="8">Greg Davies
+Alex Horne</textarea>
+    </div>
+    <button class="btn" onclick="setSeasonSpeakers()">Save Speakers</button>
+    <div class="result" id="speakers-result"></div>
+  </div>
+
+  <!-- Season Credits -->
+  <div class="section">
+    <h2>Season Credits</h2>
+    <div class="form-row">
+      <select id="sp-season-select" onchange="renderSeasonProgress()">
+        <option value="">Select a season…</option>
+      </select>
+    </div>
+    <textarea id="sp-output" readonly style="display:none;width:100%;font-family:monospace;font-size:0.85rem;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:5px;padding:10px 12px;resize:vertical;"></textarea>
+  </div>
+
+  </div><!-- /tab-seasons -->
+
 <script>
+    function switchTab(name) {
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.getElementById('tab-main').style.display    = name === 'main'    ? '' : 'none';
+      document.getElementById('tab-seasons').style.display = name === 'seasons' ? '' : 'none';
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === name);
+      });
+    }
+
     const userUid = new URLSearchParams(location.search).get('user');
 
     if (!userUid) {
@@ -809,22 +842,22 @@ Alex Horne</textarea>
       const completedEps = episodes.filter(ep =>  ep.season_complete);
 
       function buildSeasonBlocks(eps) {
-        let lastSeason = null;
-        const parts = [];
+        const seasons = [];
+        let cur = null;
         eps.forEach(ep => {
-          const seasonKey = `${ep.show_name}|${ep.season_number}`;
-          if (seasonKey !== lastSeason) {
-            const isComplete = ep.season_complete;
-            const btnLabel   = isComplete ? 'Mark active' : 'Mark complete';
-            const btnStyle   = isComplete
-              ? 'background:#1a4d22;color:#9ee8a0;border-color:#276630'
-              : 'background:#4d1a1a;color:#e89e9e;border-color:#663030';
-            parts.push(`<div class="season-separator">${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.7rem;${btnStyle}" onclick="setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div>`);
-            lastSeason = seasonKey;
-          }
-          parts.push(renderEpisodeRow(ep));
+          const key = `${ep.show_name}|${ep.season_number}`;
+          if (!cur || key !== cur.key) { cur = {key, ep, rows: []}; seasons.push(cur); }
+          cur.rows.push(ep);
         });
-        return parts.join('');
+        return seasons.map(({key, ep, rows}) => {
+          const isComplete = ep.season_complete;
+          const btnLabel   = isComplete ? 'Mark active' : 'Mark complete';
+          const btnStyle   = isComplete
+            ? 'background:#1a4d22;color:#9ee8a0;border-color:#276630'
+            : 'background:#4d1a1a;color:#e89e9e;border-color:#663030';
+          const blockId    = 'season-block-' + key.replace(/[^a-z0-9]/gi, '-');
+          return `<div class="season-separator" onclick="toggleSeason(${escHtml(JSON.stringify(key))})"><span class="season-toggle-arrow">▶</span>${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.7rem;${btnStyle}" onclick="event.stopPropagation();setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div><div id="${escHtml(blockId)}" style="display:none">${rows.map(renderEpisodeRow).join('')}</div>`;
+        }).join('');
       }
 
       let html = buildSeasonBlocks(activeEps);
@@ -882,6 +915,22 @@ Alex Horne</textarea>
       renderEpisodesWithUsers(allEpisodesWithUsers);
     }
 
+    function expandAllActiveSeasons() {
+      document.querySelectorAll('#episodes-list > [id^="season-block-"]').forEach(block => {
+        block.style.display = '';
+        block.previousElementSibling.querySelector('.season-toggle-arrow').textContent = '▼';
+      });
+    }
+
+    function toggleSeason(seasonKey) {
+      const blockId = 'season-block-' + seasonKey.replace(/[^a-z0-9]/gi, '-');
+      const block = document.getElementById(blockId);
+      const arrow = block.previousElementSibling.querySelector('.season-toggle-arrow');
+      const nowCollapsing = block.style.display !== 'none';
+      block.style.display = nowCollapsing ? 'none' : '';
+      arrow.textContent = nowCollapsing ? '▶' : '▼';
+    }
+
     function toggleCompletedSeasons() {
       const panel  = document.getElementById('completed-seasons');
       const toggle = document.querySelector('.completed-seasons-toggle');
@@ -915,7 +964,7 @@ Alex Horne</textarea>
       tbody.innerHTML = rows.map(([day, count]) => {
         const dow = new Date(day).toLocaleDateString(undefined, {weekday: 'long'});
         return `<tr><td>${escHtml(day)} ${escHtml(dow)}</td><td>${count}</td></tr>`;
-      }).join('') || '<tr><td colspan="2">No completions in the last 7 days</td></tr>';
+      }).join('') || '<tr><td colspan="2">No completions in the last 15 days</td></tr>';
     }
 
     const SORT_COLS = ['name', 'email', 'location', 'episodes_assigned', 'episodes_started', 'wants_more'];
