@@ -29,6 +29,7 @@ from db import (
     get_episodes_with_user_versions, get_all_locations, get_all_seasons,
     get_wants_more_suggestions,
     delete_test_accounts, create_user, populate_transcript, add_episode_to_user,
+    remove_episode_from_user,
     get_user_info, get_episode_info, get_user_episode_count,
     set_season_speakers, set_season_complete,
     set_location_season, update_user_location,
@@ -275,6 +276,18 @@ def action_add_episode_to_user(data):
         return "500 Internal Server Error", json.dumps({"error": str(e)})
 
 
+def action_remove_episode_from_user(data):
+    user_uid    = str(data.get("user_uid",    "") or "").strip()
+    episode_uid = str(data.get("episode_uid", "") or "").strip()
+    if not user_uid or not episode_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
+    try:
+        remove_episode_from_user(user_uid, episode_uid)
+        return "200 OK", json.dumps({"ok": True})
+    except ValueError as e:
+        return "409 Conflict", json.dumps({"error": str(e)})
+
+
 def action_set_season_complete(data):
     season_uid  = str(data.get("season_uid",  "") or "").strip()
     is_complete = bool(data.get("is_complete", False))
@@ -332,14 +345,15 @@ def action_update_user_location(data):
 
 
 POST_ACTIONS = {
-    "delete_test_accounts":    action_delete_test_accounts,
-    "create_user":             action_create_user,
-    "populate_transcript":     action_populate_transcript,
-    "add_episode_to_user":     action_add_episode_to_user,
-    "set_season_speakers":     action_set_season_speakers,
-    "set_season_complete":     action_set_season_complete,
-    "set_location_season":     action_set_location_season,
-    "update_user_location":    action_update_user_location,
+    "delete_test_accounts":      action_delete_test_accounts,
+    "create_user":               action_create_user,
+    "populate_transcript":       action_populate_transcript,
+    "add_episode_to_user":       action_add_episode_to_user,
+    "remove_episode_from_user":  action_remove_episode_from_user,
+    "set_season_speakers":       action_set_season_speakers,
+    "set_season_complete":       action_set_season_complete,
+    "set_location_season":       action_set_location_season,
+    "update_user_location":      action_update_user_location,
 }
 
 status = "200 OK"

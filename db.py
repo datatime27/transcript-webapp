@@ -381,6 +381,28 @@ def add_episode_to_user(user_uid, episode_uid):
         conn.close()
 
 
+def remove_episode_from_user(user_uid, episode_uid):
+    """Remove a user_episodes assignment. Raises ValueError if the user has saved versions."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM versions WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        if cur.fetchone()[0] > 0:
+            raise ValueError("Cannot remove — user has already saved versions for this episode.")
+        cur.execute(
+            "DELETE FROM user_episodes WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 def is_admin(user_uid):
     """Return True if the given user has admin privileges."""

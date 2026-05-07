@@ -354,6 +354,22 @@
       vertical-align: middle;
     }
 
+    .episode-user-tag-wrapper { display: inline-flex; align-items: stretch; }
+    .episode-user-tag-wrapper .episode-user-tag.unstarted { border-radius: 4px 0 0 4px; }
+    .unassign-btn {
+      font-size: 0.75rem;
+      padding: 0 5px;
+      margin-left: -1px;
+      background: #5a1a1a;
+      color: #f5a0a0;
+      border: 1px solid #7a2a2a;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .unassign-btn:hover { background: #8a2020; color: #fff; }
+
     .episode-user-tag.has-altered-cc { border-color: #cc6600 !important; }
     .altered-count {
       display: inline-block;
@@ -752,7 +768,7 @@ Alex Horne</textarea>
 
     function renderEpisodeRow(ep) {
       const isLocked = ep.users.some(u => u.is_complete && u.latest_app_version === '2.0') && ep.users.some(u => !u.is_complete);
-      const visibleUsers = ep.users.filter(u => u.version_number != null || (!u.is_admin && !u.is_test_account));
+      const visibleUsers = ep.users;
       const users = visibleUsers.length
         ? visibleUsers.slice().sort((a, b) => {
             const ta = a.version_created_at ? new Date(a.version_created_at).getTime() : 0;
@@ -771,7 +787,11 @@ Alex Horne</textarea>
               ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
               : `viewer-2.0.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
             const versionAttr = u.version_uid ? ` data-version-uid="${escHtml(u.version_uid)}"` : '';
-            return `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
+            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
+            if (u.version_number == null) {
+              return `<span class="episode-user-tag-wrapper">${tagHtml}<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this)" title="Remove assignment">×</button></span>`;
+            }
+            return tagHtml;
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
@@ -821,6 +841,24 @@ Alex Horne</textarea>
       if (completedEps.length) {
         const seasonCount = new Set(completedEps.map(ep => `${ep.show_name}|${ep.season_number}`)).size;
         document.getElementById('completed-season-count').textContent = seasonCount;
+      }
+    }
+
+    async function unassignUser(event, targetUserUid, episodeUid, btn) {
+      event.preventDefault();
+      if (!confirm('Remove this user\'s episode assignment?')) return;
+      btn.disabled = true;
+      const res = await fetch('./admin.py?' + new URLSearchParams({user: userUid}), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'remove_episode_from_user', user_uid: targetUserUid, episode_uid: episodeUid}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        btn.closest('.episode-user-tag-wrapper').remove();
+      } else {
+        alert(data.error || 'Failed to remove assignment.');
+        btn.disabled = false;
       }
     }
 
