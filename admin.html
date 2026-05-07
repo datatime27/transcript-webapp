@@ -267,7 +267,7 @@
       user-select: none;
     }
     .season-separator:first-child { padding-top: 0; }
-    .season-toggle-arrow { margin-right: 6px; }
+    .season-toggle-arrow { margin-right: 6px; font-size: 1.5em; }
 
     .episode-row {
       padding: 8px 0;
@@ -851,12 +851,12 @@ Alex Horne</textarea>
         });
         return seasons.map(({key, ep, rows}) => {
           const isComplete = ep.season_complete;
-          const btnLabel   = isComplete ? 'Mark active' : 'Mark complete';
+          const btnLabel   = isComplete ? 'Mark active' : 'Done';
           const btnStyle   = isComplete
             ? 'background:#1a4d22;color:#9ee8a0;border-color:#276630'
             : 'background:#4d1a1a;color:#e89e9e;border-color:#663030';
           const blockId    = 'season-block-' + key.replace(/[^a-z0-9]/gi, '-');
-          return `<div class="season-separator" onclick="toggleSeason(${escHtml(JSON.stringify(key))})"><span class="season-toggle-arrow">▶</span>${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.7rem;${btnStyle}" onclick="event.stopPropagation();setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div><div id="${escHtml(blockId)}" style="display:none">${rows.map(renderEpisodeRow).join('')}</div>`;
+          return `<div class="season-separator" onclick="toggleSeason(${escHtml(JSON.stringify(key))})"><span class="season-toggle-arrow">▶</span>${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.6rem;${btnStyle}" onclick="event.stopPropagation();setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div><div id="${escHtml(blockId)}" style="display:none">${rows.map(renderEpisodeRow).join('')}</div>`;
         }).join('');
       }
 
@@ -905,7 +905,7 @@ Alex Horne</textarea>
       });
       if (!res.ok) {
         btn.disabled = false;
-        btn.textContent = isComplete ? 'Mark complete' : 'Mark active';
+        btn.textContent = isComplete ? 'Done' : 'Mark active';
         alert('Failed to update season.');
         return;
       }
