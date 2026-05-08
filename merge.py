@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CGI script — merge tool for transcript versions (admin only).
+CGI script — merge tool for transcript versions.
 
   GET  /merge.py?user=xxx             → list of {episode_uid, title} with >= 2 user versions
   GET  /merge.py?episode=xxx&user=xxx → combined JSON of all user versions for the episode
@@ -21,7 +21,8 @@ try:
     from datetime import datetime, timezone
     from pathlib import Path
     from urllib.parse import parse_qs
-    from db import is_admin, get_mergeable_episodes, get_user_versions_for_episode, get_speakers_for_episode, insert_version
+    from db import get_mergeable_episodes, get_user_versions_for_episode, get_speakers_for_episode, insert_version, get_user_info, get_episode_info
+    from mail import get_admin_email, send_email
 
 
     def valid_id(uid):
@@ -31,9 +32,9 @@ try:
     params   = parse_qs(os.environ.get("QUERY_STRING", ""))
     user_uid = params.get("user", [""])[0]
 
-    if not valid_id(user_uid) or not is_admin(user_uid):
+    if not valid_id(user_uid):
         status = "403 Forbidden"
-        body   = json.dumps({"error": "Admin access required"})
+        body   = json.dumps({"error": "Valid user required"})
 
     else:
         def handle_get():
@@ -127,6 +128,19 @@ try:
                 status = "404 Not Found"
                 body   = json.dumps({"error": str(e)})
                 return
+
+            try:
+                user_info    = get_user_info(user_uid) or {}
+                user_name    = user_info.get("name") or user_uid
+                ep_info      = get_episode_info(data.get("episode_uid", "")) or {}
+                ep_desc      = f"{ep_info.get('show_name', '')} S{ep_info.get('season_number', '?')}E{ep_info.get('episode_number', '?')}" if ep_info else title
+                send_email(
+                    to      = get_admin_email(),
+                    subject = f"Merge saved: {title}",
+                    body    = f"**{user_name}** saved a merged transcript for **{ep_desc}**.\n\n**Title:** {title}\n**Version:** {new_version}",
+                )
+            except Exception:
+                pass
 
             body = json.dumps({"saved": f"{stem}.json", "version": new_version})
 
