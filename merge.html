@@ -223,6 +223,11 @@
       color: #e0e0e0;
       white-space: normal;
       word-break: break-word;
+      cursor: text;
+    }
+    .col-text[contenteditable="true"] {
+      outline: 2px solid #58b6b5;
+      border-radius: 2px;
     }
     .col-text.text-conflict {
       color: #ff0000;
@@ -638,7 +643,7 @@
       const time    = Math.floor(seconds / 60).toString().padStart(2, '0') + ':' + Math.floor(seconds % 60).toString().padStart(2, '0');
       const text    = unified.textConflict ? escHtml(getResultText(i)) : escHtml(baseCap.text || '');
       const textClass = unified.textConflict ? 'col-text text-conflict' : 'col-text';
-      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="${textClass}">${text}</td><td class="col-result">${resultCell(i)}</td>`;
+      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${time}</td><td class="${textClass}" title="Double-click to edit" ondblclick="enterTextEdit(${i}, this)">${text}</td><td class="col-result">${resultCell(i)}</td>`;
 
       unified.perVersion.forEach((cap, vi) => {
         const isDisabled = disabledVersions.has(vi);
@@ -686,6 +691,49 @@
       return `<select class="${cls}" onchange="setResultSpeaker(${i}, this.value)">${opts}</select>`;
     }
 
+    function enterTextEdit(i, td) {
+      if (td.contentEditable === 'true') return;
+      const originalText = td.textContent;
+      let done = false;
+
+      td.contentEditable = 'true';
+      if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+      td.focus();
+      const range = document.createRange();
+      range.selectNodeContents(td);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      sel.collapseToEnd();
+
+      function onKey(e) {
+        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      }
+
+      function onBlur() { finish(true); }
+
+      function finish(save) {
+        if (done) return;
+        done = true;
+        td.removeEventListener('keydown', onKey);
+        td.removeEventListener('blur', onBlur);
+        if (save) {
+          const newText = td.textContent;
+          td.contentEditable = 'false';
+          if (!selections[i]) selections[i] = { speaker: '?', modified: false };
+          selections[i].text = newText;
+          if (unifiedCaptions[i].textConflict) refreshRow(i);
+        } else {
+          td.contentEditable = 'false';
+          td.textContent = originalText;
+        }
+      }
+
+      td.addEventListener('keydown', onKey);
+      td.addEventListener('blur', onBlur);
+    }
+
     function setResultSpeaker(i, speaker) {
       const row = unifiedCaptions[i];
       if (selections[i]) {
@@ -707,7 +755,7 @@
 
       if (unified.textConflict) {
         const textTd = tr.querySelector('td.col-text');
-        if (textTd) textTd.textContent = getResultText(i);
+        if (textTd && textTd.contentEditable !== 'true') textTd.textContent = getResultText(i);
       }
 
       unified.perVersion.forEach((cap, vi) => {
@@ -776,7 +824,7 @@
     }
 
     document.addEventListener('keydown', e => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.contentEditable === 'true') return;
       if (e.key === ' ') {
         e.preventDefault();
         if (ytPlayer) {
@@ -796,7 +844,7 @@
         const base = row.perVersion.find(c => c !== null);
         const sel  = selections[i];
         return {
-          text:     (row.textConflict && sel && sel.text != null) ? sel.text : base.text,
+          text:     (sel && sel.text != null) ? sel.text : base.text,
           start:    base.start,
           duration: base.duration,
           speaker:  sel.speaker,
