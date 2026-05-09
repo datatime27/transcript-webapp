@@ -810,7 +810,7 @@ Alex Horne</textarea>
     }
 
     function renderEpisodeRow(ep) {
-      const isLocked = ep.users.some(u => u.latest_app_version === '2.0') && ep.users.some(u => !u.is_complete);
+      const isLocked = ep.show_name !== 'Taskmaster AU' && ep.users.some(u => !u.is_complete);
       const visibleUsers = ep.users;
       const users = visibleUsers.length
         ? visibleUsers.slice().sort((a, b) => {
@@ -1145,7 +1145,7 @@ Alex Horne</textarea>
     function getLockedEpisodeUids() {
       const locked = new Set();
       allEpisodesWithUsers.forEach(ep => {
-        if (ep.users.some(u => u.latest_app_version === '2.0') && ep.users.some(u => !u.is_complete)) {
+        if (ep.show_name !== 'Taskmaster AU' && ep.users.some(u => !u.is_complete)) {
           locked.add(ep.episode_uid);
         }
       });

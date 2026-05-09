@@ -351,21 +351,20 @@ def get_all_episodes():
 def add_episode_to_user(user_uid, episode_uid):
     """Assign an episode to a user by UID and clear their wants_more flag.
 
-    Raises ValueError if the episode has any v2.0 activity and any user has a non-complete assignment.
+    Raises ValueError if any user has a non-complete assignment for the episode.
     """
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT COUNT(*) FROM user_episodes ue_active
-               WHERE ue_active.episode_uid = %s
-                 AND COALESCE(ue_active.is_complete, 0) = 0
-                 AND EXISTS (
-                   SELECT 1 FROM versions v
-                   WHERE v.episode_uid = %s
-                     AND v.app_version = '2.0'
-                 )""",
-            (episode_uid, episode_uid),
+            """SELECT COUNT(*) FROM user_episodes ue
+               JOIN episodes e ON e.uid = ue.episode_uid
+               JOIN seasons s ON s.uid = e.season_uid
+               JOIN shows sh ON sh.uid = s.show_uid
+               WHERE ue.episode_uid = %s
+                 AND COALESCE(ue.is_complete, 0) = 0
+                 AND sh.name != 'Taskmaster AU'""",
+            (episode_uid,),
         )
         if cur.fetchone()[0] > 0:
             raise ValueError("This episode is currently locked — wait for all active annotators to finish before assigning.")
@@ -813,11 +812,7 @@ def get_wants_more_suggestions():
                     AND IFNULL(users.is_test_account, 0) = 0
                 WHERE episodes.season_uid IN ({placeholders})
                   AND (
-                    NOT EXISTS (
-                      SELECT 1 FROM versions v_chk
-                      WHERE v_chk.episode_uid = episodes.uid
-                        AND v_chk.app_version = '2.0'
-                    )
+                    shows.name = 'Taskmaster AU'
                     OR NOT EXISTS (
                       SELECT 1 FROM user_episodes ue_lock
                       WHERE ue_lock.episode_uid = episodes.uid
