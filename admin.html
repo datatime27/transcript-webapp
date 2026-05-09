@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin</title>
+  <title>Taskmaster Annotation Admin</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -412,7 +412,7 @@
     .section-note  { font-weight: 400; font-size: 0.8rem; }
     .text-small    { font-size: 0.75rem; }
     .text-timestamp{ font-size: 0.75rem; }
-    .link-user     { color: #88aaee; }
+    .link     { color: #88aaee; }
     .btn-row       { display: flex; gap: 8px; margin-top: 4px; }
     .mt-12         { margin-top: 12px; }
     .form-row-inline { flex-direction: row; gap: 16px; }
@@ -431,7 +431,7 @@
   </style>
 </head>
 <body>
-  <h1>Admin — <a href="dashboard.html" style="font-size:0.6em;font-weight:normal">Dashboard</a></h1>
+  <h1>Admin — <a href="dashboard.html" class="link">Dashboard</a></h1>
   <p id="load-error"></p>
 
   <div class="tab-bar">
@@ -705,7 +705,7 @@ Alex Horne</textarea>
         const link = `viewer-2.0.html?user=${r.user_uid}&episode=${r.episode_uid}`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><a href="${link}" class="link-user">${escHtml(r.user_name)}</a></td>
+          <td><a href="${link}" class="link">${escHtml(r.user_name)}</a></td>
           <td>${escHtml(r.episode_title)}</td>
           <td style="white-space:nowrap">${activityStr}</td>
           <td style="white-space:nowrap;${ageCss}">${ageStr}</td>
@@ -971,7 +971,7 @@ Alex Horne</textarea>
       const tbody = document.getElementById('recent-tbody');
       tbody.innerHTML = versions.map(v =>
         `<tr>
-          <td><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(v.user_uid)}" target="_blank" class="link-user">${escHtml(v.user_name || '—')}</a></td>
+          <td><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(v.user_uid)}" target="_blank" class="link">${escHtml(v.user_name || '—')}</a></td>
           <td>${escHtml(v.show || '—')} S${v.season} E${v.episode}</td>
           <td>v${v.version_number}</td>
           <td>${v.is_complete ? '✓' : ''}</td>
@@ -1104,7 +1104,7 @@ Alex Horne</textarea>
           <td>${u.episodes_started ?? '—'}</td>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
           <td class="text-small">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
-          <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(u.uid)}" target="_blank" class="link-user">${escHtml(u.uid)}</a></td>
+          <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(u.uid)}" target="_blank" class="link">${escHtml(u.uid)}</a></td>
           <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
         </tr>`;
       }).join('') || '<tr><td colspan="9">No users found</td></tr>';
