@@ -122,8 +122,22 @@ try:
                 encoding="utf-8",
             )
 
+            caption_count = len(captions)
+            modified_caps = [c for c in captions if c.get("modified")]
+            modified_count = len(modified_caps)
+            if modified_caps:
+                last = modified_caps[-1]
+                secs = int(float(str(last["start"]).strip().rstrip("s")))
+                h, rem = divmod(secs, 3600)
+                m, s = divmod(rem, 60)
+                latest_modification = f"{h}:{m:02d}:{s:02d}"
+            else:
+                latest_modification = None
+
             try:
-                new_version = insert_version(youtube_id, rel_path, user_uid, is_merged=True)
+                new_version = insert_version(youtube_id, rel_path, user_uid, is_merged=True,
+                                             caption_count=caption_count, modified_count=modified_count,
+                                             latest_modification=latest_modification)
             except ValueError as e:
                 status = "404 Not Found"
                 body   = json.dumps({"error": str(e)})

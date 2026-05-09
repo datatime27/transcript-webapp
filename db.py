@@ -141,7 +141,9 @@ def get_episodes_with_user_versions():
                       (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid),
                       season.is_complete, ue.is_complete, u.is_anonymous,
                       MAX(v.created_at), ue.created_at, season.uid,
-                      (SELECT app_version FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1)
+                      (SELECT app_version    FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
+                      (SELECT caption_count  FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
+                      (SELECT modified_count FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1)
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -178,6 +180,8 @@ def get_episodes_with_user_versions():
                     "is_anonymous":       bool(row[15]),
                     "version_created_at": (row[16] or row[17]).replace(tzinfo=_EASTERN).isoformat() if (row[16] or row[17]) else None,
                     "latest_app_version": row[19],
+                    "caption_count":      row[20],
+                    "modified_count":     row[21],
                 })
         for ep in episodes.values():
             ep["users"].sort(key=lambda u: (u["version_uid"] is not None, u["user_name"]))
@@ -567,7 +571,8 @@ def get_user_versions_for_episode(episode_uid):
         conn.close()
 
 
-def insert_version(youtube_id, filepath, user_uid, is_merged=None, app_version=None):
+def insert_version(youtube_id, filepath, user_uid, is_merged=None, app_version=None,
+                   caption_count=None, modified_count=None, latest_modification=None):
     """Insert a version record for the episode with the given YouTube ID."""
     conn = get_db_connection()
     try:
@@ -581,11 +586,13 @@ def insert_version(youtube_id, filepath, user_uid, is_merged=None, app_version=N
         # The derived table (AS v) is required because MySQL doesn't allow a subquery
         # to reference the same table being modified (error 1093).
         cur.execute(
-            """INSERT INTO versions (uid, episode_uid, version_number, filepath, user_uid, is_merged, app_version)
+            """INSERT INTO versions (uid, episode_uid, version_number, filepath, user_uid, is_merged, app_version,
+                                     caption_count, modified_count, latest_modification)
                VALUES (%s, %s,
                  COALESCE((SELECT MAX(v.version_number) FROM (SELECT version_number FROM versions WHERE episode_uid = %s AND user_uid <=> %s) AS v), 0) + 1,
-                 %s, %s, %s, %s)""",
-            (version_uid, episode_uid, episode_uid, user_uid, filepath, user_uid, is_merged, app_version),
+                 %s, %s, %s, %s, %s, %s, %s)""",
+            (version_uid, episode_uid, episode_uid, user_uid, filepath, user_uid, is_merged, app_version,
+             caption_count, modified_count, latest_modification),
         )
         cur.execute("SELECT version_number FROM versions WHERE uid = %s", (version_uid,))
         new_version = cur.fetchone()[0]
@@ -662,35 +669,51 @@ def get_user_latency():
             """SELECT u.name, u.uid, e.title, e.uid, s.name, season.number, e.number,
                       MAX(v.created_at) AS last_save, ue.created_at AS assigned_at,
                       COUNT(v.uid) AS version_count,
-                      (SELECT filepath FROM versions
-                       WHERE episode_uid = e.uid AND user_uid = u.uid
-                       ORDER BY version_number DESC LIMIT 1) AS latest_filepath
+                      lv.filepath AS latest_filepath,
+                      lv.caption_count, lv.modified_count, lv.latest_modification
                FROM user_episodes ue
                JOIN users u ON u.uid = ue.user_uid
                JOIN episodes e ON e.uid = ue.episode_uid
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
                LEFT JOIN versions v ON v.episode_uid = e.uid AND v.user_uid = u.uid
+               LEFT JOIN (
+                 SELECT v2.episode_uid, v2.user_uid, v2.filepath,
+                        v2.caption_count, v2.modified_count, v2.latest_modification
+                 FROM versions v2
+                 INNER JOIN (
+                   SELECT episode_uid, user_uid, MAX(version_number) AS max_vn
+                   FROM versions
+                   WHERE user_uid IS NOT NULL
+                   GROUP BY episode_uid, user_uid
+                 ) AS mv ON mv.episode_uid = v2.episode_uid
+                        AND mv.user_uid = v2.user_uid
+                        AND mv.max_vn = v2.version_number
+               ) AS lv ON lv.episode_uid = e.uid AND lv.user_uid = u.uid
                WHERE COALESCE(ue.is_complete, 0) = 0
                  AND COALESCE(u.is_admin, 0) = 0
                  AND COALESCE(u.is_test_account, 0) = 0
                  AND COALESCE(season.is_complete, 0) = 0
-               GROUP BY u.uid, u.name, e.uid, e.title, s.name, season.number, e.number, ue.created_at
+               GROUP BY u.uid, u.name, e.uid, e.title, s.name, season.number, e.number, ue.created_at,
+                        lv.filepath, lv.caption_count, lv.modified_count, lv.latest_modification
                ORDER BY COALESCE(MAX(v.created_at), ue.created_at) ASC""",
         )
         return [
             {
-                "user_name":      row[0],
-                "user_uid":       row[1],
-                "episode_title":  row[2],
-                "episode_uid":    row[3],
-                "show_name":      row[4],
-                "season_number":  row[5],
-                "episode_number": row[6],
-                "last_save_at":   row[7].replace(tzinfo=_EASTERN).isoformat() if row[7] else None,
-                "assigned_at":    row[8].replace(tzinfo=_EASTERN).isoformat() if row[8] else None,
-                "version_count":  int(row[9]),
-                "latest_filepath": row[10],
+                "user_name":            row[0],
+                "user_uid":             row[1],
+                "episode_title":        row[2],
+                "episode_uid":          row[3],
+                "show_name":            row[4],
+                "season_number":        row[5],
+                "episode_number":       row[6],
+                "last_save_at":         row[7].replace(tzinfo=_EASTERN).isoformat() if row[7] else None,
+                "assigned_at":          row[8].replace(tzinfo=_EASTERN).isoformat() if row[8] else None,
+                "version_count":        int(row[9]),
+                "latest_filepath":      row[10],
+                "caption_count":        row[11],
+                "modified_count":       row[12],
+                "latest_modification":  row[13],
             }
             for row in cur.fetchall()
         ]

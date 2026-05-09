@@ -826,11 +826,14 @@ Alex Horne</textarea>
             const dateStr = u.version_created_at
               ? ' · ' + new Date(u.version_created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
               : '';
+            const pctStr  = u.caption_count > 0
+              ? ' · ' + Math.round(100 * (u.modified_count || 0) / u.caption_count) + '%'
+              : '';
             const href    = u.version_uid
               ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
               : `viewer-2.0.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
             const versionAttr = u.version_uid ? ` data-version-uid="${escHtml(u.version_uid)}"` : '';
-            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}</a>`;
+            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}</a>`;
             if (u.version_number == null) {
               return `<span class="episode-user-tag-wrapper">${tagHtml}<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this)" title="Remove assignment">×</button></span>`;
             }

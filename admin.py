@@ -104,7 +104,12 @@ def _file_stats(filepath):
 def action_load_data():
     latency = get_user_latency()
     for row in latency[:10]:
-        row["latest_modification"], row["percent_modified"] = _file_stats(row.get("latest_filepath"))
+        if row.get("caption_count") is not None:
+            cc = row["caption_count"]
+            mc = row["modified_count"] or 0
+            row["percent_modified"] = round(100 * mc / cc) if cc else None
+        else:
+            row["latest_modification"], row["percent_modified"] = _file_stats(row.get("latest_filepath"))
     return "200 OK", json.dumps({
         "users":                       get_active_users(),
         "episodes":                    get_all_episodes(),
