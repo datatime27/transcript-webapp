@@ -254,6 +254,17 @@
     }
     .completed-seasons-toggle:hover { color: #999; }
 
+    .show-separator {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 20px 0 6px;
+      border-bottom: 3px solid #ffffff;
+      margin-bottom: 4px;
+    }
+    .show-separator:first-child { padding-top: 0; }
     .season-separator {
       font-size: 0.8rem;
       font-weight: 600;
@@ -266,7 +277,6 @@
       cursor: pointer;
       user-select: none;
     }
-    .season-separator:first-child { padding-top: 0; }
     .season-toggle-arrow { margin-right: 6px; font-size: 1.5em; }
 
     .episode-row {
@@ -421,7 +431,7 @@
   </style>
 </head>
 <body>
-  <h1>Admin</h1>
+  <h1>Admin — <a href="dashboard.html" style="font-size:0.6em;font-weight:normal">Dashboard</a></h1>
   <p id="load-error"></p>
 
   <div class="tab-bar">
@@ -829,7 +839,7 @@ Alex Horne</textarea>
         : '<span class="episode-no-users">no users allocated</span>';
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
       return `<div class="episode-row${ep.has_merged ? ' merged' : ''}">
-        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">${escHtml(ep.show_name || '—')} S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${lockBadge}</div>
+        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${lockBadge}</div>
         <div class="episode-users">${users}</div>
       </div>`;
     }
@@ -841,6 +851,8 @@ Alex Horne</textarea>
       const activeEps    = episodes.filter(ep => !ep.season_complete);
       const completedEps = episodes.filter(ep =>  ep.season_complete);
 
+      const SHOW_COLORS = ['#00ffff','#ff9900','#cc88ff','#00ff88','#ffdd00','#ff6699','#66ccff'];
+
       function buildSeasonBlocks(eps) {
         const seasons = [];
         let cur = null;
@@ -849,14 +861,27 @@ Alex Horne</textarea>
           if (!cur || key !== cur.key) { cur = {key, ep, rows: []}; seasons.push(cur); }
           cur.rows.push(ep);
         });
+
+        const showColorMap = {};
+        let colorIdx = 0;
+        seasons.forEach(({ep}) => {
+          if (!(ep.show_name in showColorMap)) showColorMap[ep.show_name] = SHOW_COLORS[colorIdx++ % SHOW_COLORS.length];
+        });
+
+        let lastShow = null;
         return seasons.map(({key, ep, rows}) => {
+          const color      = showColorMap[ep.show_name] || '#00ffff';
           const isComplete = ep.season_complete;
           const btnLabel   = isComplete ? 'Mark active' : 'Done';
           const btnStyle   = isComplete
             ? 'background:#1a4d22;color:#9ee8a0;border-color:#276630'
             : 'background:#4d1a1a;color:#e89e9e;border-color:#663030';
           const blockId    = 'season-block-' + key.replace(/[^a-z0-9]/gi, '-');
-          return `<div class="season-separator" onclick="toggleSeason(${escHtml(JSON.stringify(key))})"><span class="season-toggle-arrow">▶</span>${escHtml(ep.show_name)} — Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.6rem;${btnStyle}" onclick="event.stopPropagation();setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div><div id="${escHtml(blockId)}" style="display:none">${rows.map(renderEpisodeRow).join('')}</div>`;
+          const showHdr    = ep.show_name !== lastShow
+            ? `<div class="show-separator" style="color:${color};border-bottom-color:${color}">${escHtml(ep.show_name || '—')}</div>`
+            : '';
+          lastShow = ep.show_name;
+          return `${showHdr}<div class="season-separator" style="border-bottom-color:${color}" onclick="toggleSeason(${escHtml(JSON.stringify(key))})"><span class="season-toggle-arrow">▶</span>Season ${ep.season_number} <button class="btn-small" style="margin-left:10px;font-size:0.6rem;${btnStyle}" onclick="event.stopPropagation();setSeasonComplete(${escHtml(JSON.stringify(ep.season_uid))},${!isComplete},this)">${btnLabel}</button></div><div id="${escHtml(blockId)}" style="display:none">${rows.map(renderEpisodeRow).join('')}</div>`;
         }).join('');
       }
 
