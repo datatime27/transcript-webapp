@@ -369,7 +369,13 @@ def add_episode_to_user(user_uid, episode_uid):
         if cur.fetchone()[0] > 0:
             raise ValueError("This episode is currently locked — wait for all active annotators to finish before assigning.")
         cur.execute(
-            "INSERT IGNORE INTO user_episodes (user_uid, episode_uid) VALUES (%s, %s)",
+            "SELECT COUNT(*) FROM user_episodes WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        if cur.fetchone()[0] > 0:
+            raise ValueError("This episode is already assigned to this user.")
+        cur.execute(
+            "INSERT INTO user_episodes (user_uid, episode_uid) VALUES (%s, %s)",
             (user_uid, episode_uid),
         )
         cur.execute("UPDATE users SET wants_more = NULL WHERE uid = %s", (user_uid,))
@@ -564,6 +570,40 @@ def get_user_versions_for_episode(episode_uid):
         )
         return [
             {"user_name": row[0], "version_uid": row[1], "version_number": row[2], "filepath": row[3], "user_uid": row[4]}
+            for row in cur.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
+def get_merged_contributors():
+    """Return users who saved merged versions, grouped by season.
+    Returns [{user_uid, user_name, is_anonymous, show_name, season_number, merged_count}]."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT u.uid, u.name, u.is_anonymous, s.name, season.number, COUNT(DISTINCT v.episode_uid)
+               FROM versions v
+               JOIN users u ON u.uid = v.user_uid
+               JOIN episodes e ON e.uid = v.episode_uid
+               JOIN seasons season ON season.uid = e.season_uid
+               JOIN shows s ON s.uid = season.show_uid
+               WHERE v.is_merged = 1
+                 AND COALESCE(u.is_admin, 0) = 0
+                 AND COALESCE(u.is_test_account, 0) = 0
+               GROUP BY u.uid, season.uid
+               ORDER BY s.name, season.number, u.name"""
+        )
+        return [
+            {
+                "user_uid":      row[0],
+                "user_name":     row[1],
+                "is_anonymous":  bool(row[2]),
+                "show_name":     row[3],
+                "season_number": row[4],
+                "merged_count":  row[5],
+            }
             for row in cur.fetchall()
         ]
     finally:

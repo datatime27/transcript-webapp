@@ -660,6 +660,7 @@ Alex Horne</textarea>
     let allEpisodes           = [];
     let selectedUserUid       = null;
     let allEpisodesWithUsers  = [];
+    let allMergedContributors = [];
     let userSortKey           = null;
     let userSortAsc           = true;
     let wantsMoreSuggestions  = {};
@@ -674,6 +675,7 @@ Alex Horne</textarea>
       allUsers = data.users;
       allEpisodes = data.episodes;
       allEpisodesWithUsers = data.episodes_with_user_versions;
+      allMergedContributors = data.merged_contributors || [];
       wantsMoreSuggestions = data.wants_more_suggestions || {};
       renderRecentVersions(data.recent_versions);
       renderDonePerDay(data.recent_versions);
@@ -800,11 +802,32 @@ Alex Horne</textarea>
         });
       });
 
+      // Fold in users who saved merged versions but may not be in user_episodes
+      allMergedContributors
+        .filter(mc => mc.show_name === showName && String(mc.season_number) === seasonNum)
+        .forEach(mc => {
+          if (!userMap[mc.user_uid]) {
+            userMap[mc.user_uid] = {
+              user_name:    mc.user_name,
+              user_uid:     mc.user_uid,
+              is_anonymous: mc.is_anonymous,
+              saved: 0,
+              total: 0,
+            };
+          }
+          userMap[mc.user_uid].merged = mc.merged_count;
+        });
+
       const users = Object.values(userMap).sort((a, b) =>
-        b.saved - a.saved || (a.user_name || '').localeCompare(b.user_name || '')
+        (b.saved + (b.merged || 0)) - (a.saved + (a.merged || 0)) || (a.user_name || '').localeCompare(b.user_name || '')
       );
 
-      out.value = users.map(u => `${u.user_name || u.user_uid}${u.is_anonymous ? ' (anon)' : ''}: ${u.saved}`).join('\n');
+      out.value = users.map(u => {
+        const name = `${u.user_name || u.user_uid}${u.is_anonymous ? ' (anon)' : ''}`;
+        if (u.saved && u.merged) return `${name}: ${u.saved} + ${u.merged} merged`;
+        if (u.merged)            return `${name}: ${u.merged} merged`;
+        return `${name}: ${u.saved}`;
+      }).join('\n');
       out.rows  = Math.max(3, users.length);
       out.style.display  = 'block';
     }
@@ -1152,7 +1175,7 @@ Alex Horne</textarea>
       return locked;
     }
 
-    function renderEpisodeSelect(episodes) {
+    function renderEpisodeSelect(episodes, assignedUids = new Set()) {
       const sel = document.getElementById('ae-episode');
       sel.innerHTML = '<option value="">Select an episode…</option>';
       const locked = getLockedEpisodeUids();
@@ -1168,9 +1191,10 @@ Alex Horne</textarea>
         }
         const opt = document.createElement('option');
         opt.value = ep.uid;
-        const isLocked = locked.has(ep.uid);
-        opt.textContent = `S${ep.season} E${ep.episode}${isLocked ? ' (locked)' : ''}`;
-        opt.disabled = isLocked;
+        const isLocked    = locked.has(ep.uid);
+        const isAssigned  = assignedUids.has(ep.uid);
+        opt.textContent = `S${ep.season} E${ep.episode}${isLocked ? ' (locked)' : isAssigned ? ' (already assigned)' : ''}`;
+        opt.disabled = isLocked || isAssigned;
         group.appendChild(opt);
       });
     }
@@ -1180,6 +1204,12 @@ Alex Horne</textarea>
       document.getElementById('ae-user-name').textContent = name;
       document.getElementById('ae-episode').value = '';
       clearResult('add-episode-result');
+      const assignedUids = new Set(
+        allEpisodesWithUsers
+          .filter(ep => ep.users.some(u => u.user_uid === userUid))
+          .map(ep => ep.episode_uid)
+      );
+      renderEpisodeSelect(allEpisodes, assignedUids);
       document.getElementById('add-episode-panel').style.display = 'block';
     }
 

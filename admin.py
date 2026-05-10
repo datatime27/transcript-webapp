@@ -33,7 +33,7 @@ from db import (
     get_user_info, get_episode_info, get_user_episode_count,
     set_season_speakers, set_season_complete,
     set_location_season, update_user_location,
-    get_reapply_data, get_user_latency,
+    get_reapply_data, get_user_latency, get_merged_contributors,
 )
 from annotation_utils import apply_annotations
 from mail import send_email
@@ -119,6 +119,7 @@ def action_load_data():
         "seasons":                     get_all_seasons(),
         "wants_more_suggestions":      get_wants_more_suggestions(),
         "user_latency":                latency,
+        "merged_contributors":         get_merged_contributors(),
     }, ensure_ascii=False)
 
 
