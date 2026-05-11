@@ -842,7 +842,9 @@ def get_wants_more_suggestions():
             placeholders = ','.join(['%s'] * len(needed))
             cur.execute(
                 f"""
-                SELECT episodes.season_uid, episodes.uid, shows.name, seasons.number, episodes.number, COUNT(users.uid) AS cnt
+                SELECT episodes.season_uid, episodes.uid, shows.name, seasons.number, episodes.number,
+                       COUNT(users.uid) AS cnt,
+                       COUNT(CASE WHEN ue.is_complete = 1 THEN users.uid END) AS complete_cnt
                 FROM episodes
                   JOIN seasons ON seasons.uid = episodes.season_uid
                   JOIN shows ON shows.uid = seasons.show_uid
@@ -860,7 +862,7 @@ def get_wants_more_suggestions():
                     )
                   )
                 GROUP BY episodes.season_uid, episodes.uid, shows.name, seasons.number, episodes.number
-                HAVING cnt < 4
+                HAVING cnt < 4 AND complete_cnt < 3
                 ORDER BY episodes.season_uid, cnt ASC, episodes.number ASC
                 """,
                 list(needed),
