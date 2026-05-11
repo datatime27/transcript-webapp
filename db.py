@@ -954,16 +954,15 @@ def get_merge_assignment_episode_uids(user_uid):
 
 
 def set_location_season(location, season_uid):
-    """Update the season_uid for a location row."""
+    """Insert or update the season_uid for a location row."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         cur.execute(
-            "UPDATE locations SET season_uid = %s WHERE location = %s",
-            (season_uid, location),
+            "INSERT INTO locations (location, season_uid) VALUES (%s, %s) "
+            "ON DUPLICATE KEY UPDATE season_uid = VALUES(season_uid)",
+            (location, season_uid),
         )
-        if cur.rowcount == 0:
-            raise ValueError(f"Location not found: {location!r}")
         conn.commit()
     except Exception:
         conn.rollback()
