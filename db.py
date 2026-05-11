@@ -886,6 +886,73 @@ def get_wants_more_suggestions():
         conn.close()
 
 
+def add_merge_assignment(user_uid, episode_uid):
+    """Assign an episode to a user for merging. Raises ValueError if already assigned."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM merge_assignments WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        if cur.fetchone():
+            raise ValueError("This episode is already assigned to this user for merging.")
+        cur.execute(
+            "INSERT INTO merge_assignments (user_uid, episode_uid) VALUES (%s, %s)",
+            (user_uid, episode_uid),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def remove_merge_assignment(user_uid, episode_uid):
+    """Remove a merge assignment. Raises ValueError if not found."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM merge_assignments WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        if cur.rowcount == 0:
+            raise ValueError("Merge assignment not found.")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_all_merge_assignments():
+    """Return all merge assignments as [{user_uid, episode_uid}]."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT user_uid, episode_uid FROM merge_assignments")
+        return [{"user_uid": row[0], "episode_uid": row[1]} for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_merge_assignment_episode_uids(user_uid):
+    """Return the set of episode_uids assigned to a user for merging."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT episode_uid FROM merge_assignments WHERE user_uid = %s",
+            (user_uid,),
+        )
+        return {row[0] for row in cur.fetchall()}
+    finally:
+        conn.close()
+
+
 def set_location_season(location, season_uid):
     """Update the season_uid for a location row."""
     conn = get_db_connection()

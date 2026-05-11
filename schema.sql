@@ -86,3 +86,12 @@ CREATE TABLE speaker_associations (
     KEY idx_speaker_order (season_uid, order_index),
     FOREIGN KEY (season_uid) REFERENCES seasons(uid)
 );
+
+CREATE TABLE merge_assignments (
+    user_uid    VARCHAR(8) NOT NULL,
+    episode_uid VARCHAR(8) NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_uid, episode_uid),
+    FOREIGN KEY (user_uid)    REFERENCES users(uid),
+    FOREIGN KEY (episode_uid) REFERENCES episodes(uid)
+);

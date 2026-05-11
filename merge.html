@@ -463,6 +463,15 @@
       if (!res.ok) { showError(data.error || 'Failed to load versions'); return; }
       if (data.versions.length < 2) { showError('Need at least 2 user versions to compare.'); return; }
 
+      const _normSpeaker = s => s
+        .replace(/[​‌‍﻿­]/g, '')
+        .normalize('NFC')
+        .trim();
+      data.speakers = (data.speakers || []).map(_normSpeaker);
+      data.versions.forEach(v => v.captions.forEach(cap => {
+        if (cap.speaker) cap.speaker = _normSpeaker(cap.speaker);
+      }));
+
       episodeData     = data;
       unifiedCaptions = buildUnifiedCaptions(data.versions);
       document.getElementById('episode-title').textContent = decodeHtml(data.title || '');
@@ -530,12 +539,19 @@
       }
     }
 
+    function knownSpeakerSet() {
+      return new Set([...(episodeData.speakers || []), 'Other', 'MULTIPLE', '?']);
+    }
+
     function initSelections() {
+      const known = knownSpeakerSet();
       selections = [];
       for (const row of unifiedCaptions) {
         const present = row.perVersion.filter((c, vi) => c !== null && !disabledVersions.has(vi));
         if (present.length === 0) { selections.push(null); continue; }
-        selections.push(resolveSelection(present, row.textConflict) || { speaker: '?', modified: false });
+        const resolved = resolveSelection(present, row.textConflict) || { speaker: '?', modified: false };
+        if (!known.has(resolved.speaker)) resolved.speaker = '?';
+        selections.push(resolved);
       }
     }
 
@@ -680,10 +696,11 @@
     function resultCell(i) {
       const speakers = [...((episodeData && episodeData.speakers) || []), 'Other', 'MULTIPLE'];
       const current  = selections[i] ? selections[i].speaker : '';
-      const unresolved = current === '?';
+      const unresolved = current === '?' || (current && !speakers.includes(current));
       if (unresolved) speakers.push('?');
+      const selectTarget = unresolved ? '?' : current;
       const opts = speakers.map(sp => {
-        const selected = sp === current ? ' selected' : '';
+        const selected = sp === selectTarget ? ' selected' : '';
         const style    = sp === '?' ? ' style="color:#ff0000;font-weight:600;"' : ' style="color:#e0e0e0;font-weight:normal;"';
         return `<option value="${escHtml(sp)}"${selected}${style}>${escHtml(sp)}</option>`;
       }).join('');

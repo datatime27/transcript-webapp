@@ -226,7 +226,7 @@
       color: #aaa;
     }
 
-    #add-episode-panel {
+    #add-episode-panel, #assign-merge-panel {
       display: none;
       margin-top: 12px;
       padding: 12px;
@@ -235,12 +235,33 @@
       border-radius: 6px;
     }
 
-    #add-episode-panel p {
+    #add-episode-panel p, #assign-merge-panel p {
       font-size: 0.85rem;
       margin-bottom: 10px;
     }
 
-    #add-episode-panel strong { color: #e0e0e0; }
+    #add-episode-panel strong, #assign-merge-panel strong { color: #e0e0e0; }
+
+    #am-existing { margin-bottom: 10px; }
+    .am-existing-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #ccc;
+      padding: 3px 0;
+    }
+    .am-remove-btn {
+      background: none;
+      border: 1px solid #555;
+      color: #aaa;
+      border-radius: 3px;
+      cursor: pointer;
+      padding: 1px 5px;
+      font-size: 0.75rem;
+      line-height: 1.4;
+    }
+    .am-remove-btn:hover { border-color: #e57373; color: #e57373; }
 
     .completed-seasons-toggle {
       font-size: 0.8rem;
@@ -286,6 +307,9 @@
     .episode-row:last-child { border-bottom: none; }
     .episode-row.merged {
       background: #005500;
+    }
+    .episode-row.merge-assigned {
+      background: #958301;
     }
 
     a.episode-merge-link, a.episode-merge-link:visited {
@@ -522,6 +546,18 @@
       </div>
       <div class="result" id="add-episode-result"></div>
     </div>
+    <div id="assign-merge-panel">
+      <p>Merge assignments for <strong id="am-user-name"></strong></p>
+      <div id="am-existing"></div>
+      <div class="form-row">
+        <select id="am-episode"><option value="">Add a merge episode…</option></select>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="addMergeAssignment()">Assign Merge</button>
+        <button class="btn-small" onclick="hideAssignMergePanel()">Close</button>
+      </div>
+      <div class="result" id="assign-merge-result"></div>
+    </div>
     <div class="mt-12">
       <button class="btn btn-danger" id="delete-test-btn" onclick="deleteTestAccounts()" style="display:none">
         Delete test accounts (<span id="test-count">0</span>)
@@ -659,8 +695,11 @@ Alex Horne</textarea>
     let allUsers              = [];
     let allEpisodes           = [];
     let selectedUserUid       = null;
+    let selectedMergeUserUid  = null;
     let allEpisodesWithUsers  = [];
     let allMergedContributors = [];
+    let allMergeableEpisodes  = [];
+    let allMergeAssignments   = [];
     let userSortKey           = null;
     let userSortAsc           = true;
     let wantsMoreSuggestions  = {};
@@ -676,6 +715,8 @@ Alex Horne</textarea>
       allEpisodes = data.episodes;
       allEpisodesWithUsers = data.episodes_with_user_versions;
       allMergedContributors = data.merged_contributors || [];
+      allMergeableEpisodes = data.mergeable_episodes || [];
+      allMergeAssignments = data.merge_assignments || [];
       wantsMoreSuggestions = data.wants_more_suggestions || {};
       renderRecentVersions(data.recent_versions);
       renderDonePerDay(data.recent_versions);
@@ -864,7 +905,8 @@ Alex Horne</textarea>
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
-      return `<div class="episode-row${ep.has_merged ? ' merged' : ''}">
+      const hasMergeAssignment = allMergeAssignments.some(a => a.episode_uid === ep.episode_uid);
+      return `<div class="episode-row${ep.has_merged ? ' merged' : hasMergeAssignment ? ' merge-assigned' : ''}">
         <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${lockBadge}</div>
         <div class="episode-users">${users}</div>
       </div>`;
@@ -1128,7 +1170,10 @@ Alex Horne</textarea>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
           <td class="text-small">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
           <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(u.uid)}" target="_blank" class="link">${escHtml(u.uid)}</a></td>
-          <td><button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button></td>
+          <td style="white-space:nowrap">
+            <button class="btn-small" onclick="showAddEpisodePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Add Episode</button>
+            <button class="btn-small" style="margin-left:4px" onclick="showAssignMergePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Assign Merge</button>
+          </td>
         </tr>`;
       }).join('') || '<tr><td colspan="9">No users found</td></tr>';
 
@@ -1216,6 +1261,100 @@ Alex Horne</textarea>
     function hideAddEpisodePanel() {
       document.getElementById('add-episode-panel').style.display = 'none';
       selectedUserUid = null;
+    }
+
+    function getMergeAssignedUidsForUser(userUid) {
+      return allMergeAssignments.filter(a => a.user_uid === userUid).map(a => a.episode_uid);
+    }
+
+    function renderMergeEpisodeSelect(userUid) {
+      const sel = document.getElementById('am-episode');
+      sel.innerHTML = '<option value="">Add a merge episode…</option>';
+      const mergedUids   = new Set(allEpisodesWithUsers.filter(e => e.has_merged).map(e => e.episode_uid));
+      const assignedUids = new Set(allMergeAssignments.map(a => a.episode_uid));
+      const episodeMap   = Object.fromEntries(allEpisodes.map(e => [e.uid, e]));
+      let lastSeason = null;
+      let group = null;
+      allMergeableEpisodes
+        .filter(me => !mergedUids.has(me.episode_uid) && !assignedUids.has(me.episode_uid))
+        .forEach(me => {
+          const ep = episodeMap[me.episode_uid];
+          if (!ep) return;
+          const seasonKey = `${ep.show}|${ep.season}`;
+          if (seasonKey !== lastSeason) {
+            group = document.createElement('optgroup');
+            group.label = `${ep.show} — Season ${ep.season}`;
+            sel.appendChild(group);
+            lastSeason = seasonKey;
+          }
+          const opt = document.createElement('option');
+          opt.value = me.episode_uid;
+          opt.textContent = `S${ep.season} E${ep.episode}`;
+          group.appendChild(opt);
+        });
+    }
+
+    function renderExistingMergeAssignments(userUid) {
+      const container = document.getElementById('am-existing');
+      const assigned = getMergeAssignedUidsForUser(userUid);
+      if (!assigned.length) {
+        container.innerHTML = '<div style="font-size:0.82rem;color:#666;margin-bottom:6px">No merge episodes assigned yet.</div>';
+        return;
+      }
+      const episodeMap = Object.fromEntries(allMergeableEpisodes.map(e => [e.episode_uid, e.title]));
+      container.innerHTML = assigned.map(epUid => {
+        const title = episodeMap[epUid] || epUid;
+        return `<div class="am-existing-row">
+          <span>${escHtml(title)}</span>
+          <button class="am-remove-btn" onclick="removeMergeAssignment(${escHtml(JSON.stringify(userUid))}, ${escHtml(JSON.stringify(epUid))})">×</button>
+        </div>`;
+      }).join('');
+    }
+
+    function showAssignMergePanel(userUid, name) {
+      selectedMergeUserUid = userUid;
+      document.getElementById('am-user-name').textContent = name;
+      document.getElementById('am-episode').value = '';
+      clearResult('assign-merge-result');
+      renderExistingMergeAssignments(userUid);
+      renderMergeEpisodeSelect(userUid);
+      document.getElementById('add-episode-panel').style.display = 'none';
+      document.getElementById('assign-merge-panel').style.display = 'block';
+    }
+
+    function hideAssignMergePanel() {
+      document.getElementById('assign-merge-panel').style.display = 'none';
+      selectedMergeUserUid = null;
+    }
+
+    async function addMergeAssignment() {
+      const user_uid    = selectedMergeUserUid;
+      const episode_uid = document.getElementById('am-episode').value;
+      if (!user_uid || !episode_uid) { showResult('assign-merge-result', false, 'Select an episode.'); return; }
+      clearResult('assign-merge-result');
+      const res  = await post({ action: 'add_merge_assignment', user_uid, episode_uid });
+      const data = await res.json();
+      if (res.ok) {
+        allMergeAssignments.push({ user_uid, episode_uid });
+        showResult('assign-merge-result', true, 'Merge episode assigned and email sent.');
+        renderExistingMergeAssignments(user_uid);
+        renderMergeEpisodeSelect(user_uid);
+      } else {
+        showResult('assign-merge-result', false, data.error);
+      }
+    }
+
+    async function removeMergeAssignment(user_uid, episode_uid) {
+      clearResult('assign-merge-result');
+      const res  = await post({ action: 'remove_merge_assignment', user_uid, episode_uid });
+      const data = await res.json();
+      if (res.ok) {
+        allMergeAssignments = allMergeAssignments.filter(a => !(a.user_uid === user_uid && a.episode_uid === episode_uid));
+        renderExistingMergeAssignments(user_uid);
+        renderMergeEpisodeSelect(user_uid);
+      } else {
+        showResult('assign-merge-result', false, data.error);
+      }
     }
 
     async function deleteTestAccounts() {

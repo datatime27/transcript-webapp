@@ -34,6 +34,8 @@ from db import (
     set_season_speakers, set_season_complete,
     set_location_season, update_user_location,
     get_reapply_data, get_user_latency, get_merged_contributors,
+    add_merge_assignment, remove_merge_assignment,
+    get_all_merge_assignments, get_mergeable_episodes,
 )
 from annotation_utils import apply_annotations
 from mail import send_email
@@ -120,6 +122,8 @@ def action_load_data():
         "wants_more_suggestions":      get_wants_more_suggestions(),
         "user_latency":                latency,
         "merged_contributors":         get_merged_contributors(),
+        "mergeable_episodes":          get_mergeable_episodes(),
+        "merge_assignments":           get_all_merge_assignments(),
     }, ensure_ascii=False)
 
 
@@ -350,6 +354,43 @@ def action_update_user_location(data):
         return "500 Internal Server Error", json.dumps({"error": str(e)})
 
 
+def action_add_merge_assignment(data):
+    user_uid    = str(data.get("user_uid",    "") or "").strip()
+    episode_uid = str(data.get("episode_uid", "") or "").strip()
+    if not user_uid or not episode_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
+    try:
+        add_merge_assignment(user_uid, episode_uid)
+    except ValueError as e:
+        return "409 Conflict", json.dumps({"error": str(e)})
+    try:
+        user    = get_user_info(user_uid)
+        episode = get_episode_info(episode_uid)
+        if user and episode:
+            label      = f"{episode['show_name']} S{episode['season_number']}E{episode['episode_number']}"
+            merge_url  = f"https://itsdatatime.com/transcript-webapp/merge.html?user={user_uid}&episode={episode_uid}"
+            send_email(
+                to      = user["email"],
+                subject = f"New episode ready to merge: {label}",
+                body    = f"Hi {user['name']}!\n\nA new episode is ready for you to merge: **{label}**\n\n{merge_url}",
+            )
+    except Exception as e:
+        return "500 Internal Server Error", json.dumps({"error": str(e)})
+    return "200 OK", json.dumps({"ok": True})
+
+
+def action_remove_merge_assignment(data):
+    user_uid    = str(data.get("user_uid",    "") or "").strip()
+    episode_uid = str(data.get("episode_uid", "") or "").strip()
+    if not user_uid or not episode_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
+    try:
+        remove_merge_assignment(user_uid, episode_uid)
+        return "200 OK", json.dumps({"ok": True})
+    except ValueError as e:
+        return "409 Conflict", json.dumps({"error": str(e)})
+
+
 POST_ACTIONS = {
     "delete_test_accounts":      action_delete_test_accounts,
     "create_user":               action_create_user,
@@ -360,6 +401,8 @@ POST_ACTIONS = {
     "set_season_complete":       action_set_season_complete,
     "set_location_season":       action_set_location_season,
     "update_user_location":      action_update_user_location,
+    "add_merge_assignment":      action_add_merge_assignment,
+    "remove_merge_assignment":   action_remove_merge_assignment,
 }
 
 status = "200 OK"
