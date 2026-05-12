@@ -1254,6 +1254,10 @@ Alex Horne</textarea>
       const sel = document.getElementById('ae-episode');
       sel.innerHTML = '<option value="">Select an episode…</option>';
       const locked = getLockedEpisodeUids();
+      const completedMap = {};
+      allEpisodesWithUsers.forEach(ep => {
+        completedMap[ep.episode_uid] = ep.users.filter(u => u.is_complete && !u.is_admin && !u.is_test_account).length;
+      });
       let lastSeason = null;
       let group = null;
       episodes.filter(ep => !ep.season_complete).forEach(ep => {
@@ -1266,9 +1270,11 @@ Alex Horne</textarea>
         }
         const opt = document.createElement('option');
         opt.value = ep.uid;
-        const isLocked    = locked.has(ep.uid);
-        const isAssigned  = assignedUids.has(ep.uid);
-        opt.textContent = `S${ep.season} E${ep.episode}${isLocked ? ' (locked)' : isAssigned ? ' (already assigned)' : ''}`;
+        const isLocked       = locked.has(ep.uid);
+        const isAssigned     = assignedUids.has(ep.uid);
+        const completedCount = completedMap[ep.uid] || 0;
+        const doneNote       = completedCount >= 3 ? ` [${completedCount} done]` : '';
+        opt.textContent = `S${ep.season} E${ep.episode}${isLocked ? ' (locked)' : isAssigned ? ' (already assigned)' : ''}${doneNote}`;
         opt.disabled = isLocked || isAssigned;
         group.appendChild(opt);
       });
