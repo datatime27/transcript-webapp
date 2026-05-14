@@ -452,6 +452,23 @@
     .tab-btn.active { color: #00ffff; border-bottom-color: #00ffff; }
     .tab-btn:hover:not(.active) { color: #ccc; }
 
+    #tag-tooltip {
+      position: fixed;
+      z-index: 9999;
+      background: #1a1a2e;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      line-height: 1.7;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+      display: none;
+    }
+    #tag-tooltip .tt-label { color: #888; }
+
   </style>
 </head>
 <body>
@@ -926,8 +943,12 @@ Alex Horne</textarea>
             const href    = u.version_uid
               ? `https://itsdatatime.com/transcript-webapp/reapply.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
               : `viewer-2.0.html?user=${encodeURIComponent(u.user_uid)}&episode=${encodeURIComponent(ep.episode_uid)}`;
-            const versionAttr = u.version_uid ? ` data-version-uid="${escHtml(u.version_uid)}"` : '';
-            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}</a>`;
+            const versionAttr   = u.version_uid           ? ` data-version-uid="${escHtml(u.version_uid)}"` : '';
+            const createdAtAttr = u.version_created_at    ? ` data-created-at="${escHtml(u.version_created_at)}"` : '';
+            const modifiedAttr  = u.modified_count != null ? ` data-modified="${u.modified_count}"` : '';
+            const totalAttr     = u.caption_count  != null ? ` data-total="${u.caption_count}"` : '';
+            const lastModAttr   = u.latest_modification   ? ` data-last-mod="${escHtml(u.latest_modification)}"` : '';
+            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}${createdAtAttr}${modifiedAttr}${totalAttr}${lastModAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}</a>`;
             if (u.version_number == null) {
               return `<span class="episode-user-tag-wrapper">${tagHtml}<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this)" title="Remove assignment">×</button></span>`;
             }
@@ -1622,6 +1643,60 @@ Alex Horne</textarea>
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
     }
+
+    // --- Episode user tag tooltip ---
+    function formatTooltipDate(isoStr) {
+      return new Date(isoStr).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      });
+    }
+
+    function positionTooltip(e) {
+      const tt  = document.getElementById('tag-tooltip');
+      const pad = 14;
+      let x = e.clientX + pad;
+      let y = e.clientY + pad;
+      const w = tt.offsetWidth, h = tt.offsetHeight;
+      if (x + w > window.innerWidth  - 6) x = e.clientX - w - pad;
+      if (y + h > window.innerHeight - 6) y = e.clientY - h - pad;
+      tt.style.left = x + 'px';
+      tt.style.top  = y + 'px';
+    }
+
+    document.addEventListener('mousemove', e => {
+      if (document.getElementById('tag-tooltip').style.display !== 'none') positionTooltip(e);
+    });
+
+    document.addEventListener('mouseover', e => {
+      const tag = e.target.closest('.episode-user-tag');
+      if (!tag) return;
+
+      const createdAt = tag.dataset.createdAt || null;
+      const modified  = tag.dataset.modified !== '' && tag.dataset.modified != null ? parseInt(tag.dataset.modified) : null;
+      const total     = tag.dataset.total    !== '' && tag.dataset.total    != null ? parseInt(tag.dataset.total)    : null;
+      const lastMod   = tag.dataset.lastMod  || null;
+
+      const rows = [];
+      if (createdAt) rows.push(`<span class="tt-label">Saved:</span> ${formatTooltipDate(createdAt)}`);
+      if (total != null) rows.push(`<span class="tt-label">Modified:</span> ${modified != null ? modified : '?'} / ${total} lines`);
+      if (lastMod)   rows.push(`<span class="tt-label">Last modified caption:</span> ${lastMod}`);
+
+      const tt = document.getElementById('tag-tooltip');
+      tt.innerHTML     = rows.join('<br>');
+      tt.style.display = 'block';
+      positionTooltip(e);
+    });
+
+    document.addEventListener('mouseout', e => {
+      const tag = e.target.closest('.episode-user-tag');
+      if (!tag) return;
+      if (!e.relatedTarget || !e.relatedTarget.closest('.episode-user-tag')) {
+        document.getElementById('tag-tooltip').style.display = 'none';
+      }
+    });
   </script>
+
+  <div id="tag-tooltip"></div>
 </body>
 </html>

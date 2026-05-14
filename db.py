@@ -141,9 +141,10 @@ def get_episodes_with_user_versions():
                       (SELECT MAX(v2.is_merged) FROM versions v2 WHERE v2.episode_uid = e.uid),
                       season.is_complete, ue.is_complete, u.is_anonymous,
                       MAX(v.created_at), ue.created_at, season.uid,
-                      (SELECT app_version    FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
-                      (SELECT caption_count  FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
-                      (SELECT modified_count FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1)
+                      (SELECT app_version        FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
+                      (SELECT caption_count      FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
+                      (SELECT modified_count     FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
+                      (SELECT latest_modification FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1)
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -179,9 +180,10 @@ def get_episodes_with_user_versions():
                     "is_complete":        bool(row[14]),
                     "is_anonymous":       bool(row[15]),
                     "version_created_at": (row[16] or row[17]).replace(tzinfo=_EASTERN).isoformat() if (row[16] or row[17]) else None,
-                    "latest_app_version": row[19],
-                    "caption_count":      row[20],
-                    "modified_count":     row[21],
+                    "latest_app_version":    row[19],
+                    "caption_count":         row[20],
+                    "modified_count":        row[21],
+                    "latest_modification":   row[22],
                 })
         for ep in episodes.values():
             ep["users"].sort(key=lambda u: (u["version_uid"] is not None, u["user_name"]))
