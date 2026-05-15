@@ -43,26 +43,50 @@ from mail import send_email
 
 _WELCOME_BODY = """\
 Hi {name}!
-Thank you so much for volunteering to help out with the Taskmaster transcripts. I have created a web app online for you to use.
+Thank you so much for volunteering to help out with the Taskmaster transcripts. 
+I have created a web app online for you to use.
 
 **Intro**
-My webpage loads the YouTube episode alongside the transcript. I'm already running a process over the transcript to estimate who is speaking. However the process is wrong as often as it is right. That's where you come in.
+My webpage loads the YouTube episode alongside the transcript. 
+I'm already running a process to create the transcript and estimate who is speaking for each caption. 
+However the process is wrong as often as it is right. That's where you come in.
+When you're assigned an episode, you will either get a new transcript that needs speakers assigned or an transcript someone else has worked on that needs to be reviewed by you.
+Regardless, you need to go through the entire transcript and ensure all of the words are correct and all of the speakers are correct.
 
-**Where to begin**
-The process I used to estimate speakers doesn't know speaker names, so you'll just see SPEAKER_00, SPEAKER_01, etc.
-The first time you change a SPEAKER_ to a real name the tool will ask you if you'd like to swap all other instances of that speaker as well. Be warned sometimes the tool gets the speaker wrong (especially during the intro theme), so check that a given speaker seems correct before switching all of them. In practice I found it's best to start with the prize task. Then each of the 7 speakers gets a turn at speaking, which will give you a better idea of who is who.
-There is also the "Other" speaker which is for anything that can't be attributed to one of the 7 speakers: (e.g.: applause, noises, guest speaker)
+**New transcript**
+If you get a new transcript, you'll just see SPEAKER_00, SPEAKER_01, etc.
+The first time you change a SPEAKER_ to a real name the tool will ask you if you'd like to swap all other instances of that speaker as well. 
+Be warned sometimes the tool gets the speaker wrong (especially during the intro theme), so check that a given speaker seems correct before switching all of them. 
+In practice I found it's best to start with the prize task. Then each of the 7 speakers gets a turn at speaking, which will give you a better idea of who is who.
+
+**Existing transcript**
+If you get an existing transcript, the speakers will already be assigned but they might be wrong.
+The caption text might also be wrong.
+
+**Speaker names**
+Any sounds made by a speaker e.g. "[whistle blows]" can be attributed to that speaker, however they aren't the priority.
+There is also the "Other" speaker which is for anything that can't be attributed to one of the 7 speakers: (e.g.: applause, guest speaker)
+If multiple speakers say the same words in unison, you can attribute them to the "MULTIPLE" speaker.
+
+**Editing**
+You can also edit the text of the captions, as well as add/remove/split lines. 
+Splitting lines is especially useful when one line has two sentences spoken by two speakers.
+You can also edit the timecodes, since they sometimes get out of sync.
 
 **Caveats**
-My process that annotated the speakers seems to have trouble with people speaking quickly back and forth, so quick banter or the live studio task will require more fixes from you.
-Also any transition from one speaker to another will sometimes be off by one caption.
-The timecode is MOSTLY in sync with the video, but there are some spots where the timecode information might be off a bit.
+The transcripts seems to have trouble with people speaking quickly back and forth, so quick banter or the live studio task will require more fixes from you.
+Any transition from one speaker to another will frequently be off by one caption.
 
 **YOUR TASK**
-This is your personal link to the tool. Please don't share this with anyone else. I'm creating a different link for each person otherwise this would be impossible to track. Further instructions on how to use the app can be found on the link. Please let me know if you have any issues, comments, improvements for the tool.
+This is your personal link to the tool. 
+Please don't share this with anyone else. 
+I'm creating a different link for each person otherwise this would be impossible to track. 
+Further instructions on how to use the app can be found on the link. 
+Please let me know if you have any issues, comments, improvements for the tool.
 
 **YOUR LINK:** {link}
 
+Thank you!
 Your time starts now!
 -Peter
 "Data Time"
