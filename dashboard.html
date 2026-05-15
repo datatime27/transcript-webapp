@@ -430,7 +430,7 @@
 
   // --- Time series chart ---
 
-  let _chartPts = [], _chartHist = [], _chartVW = 560, _chartPadL = 44, _chartSegW = 1;
+  let _chartPts = [], _chartHist = [], _chartVW = 0, _chartPadL = 44, _chartSegW = 1;
 
   function fmtChartDate(dateStr) {
     const [, m, d] = dateStr.split('-').map(Number);
@@ -450,8 +450,12 @@
     const container = document.getElementById('chart-container');
     if (!history || history.length < 2 || !container) return;
 
-    const W = 560, H = 110;
+    const H = 110;
     const padL = 44, padR = 16, padT = 10, padB = 30;
+    // Measure inner content width from the already-rendered progress section
+    // (.progress-section has padding: 12px 16px, so subtract 32 for left+right)
+    const refSection = document.querySelector('#progress-container .progress-section');
+    const W = Math.max(200, refSection ? refSection.clientWidth - 32 : window.innerWidth - 80);
     const cW = W - padL - padR, cH = H - padT - padB;
 
     const pcts  = history.map(h => h.pct);
@@ -497,7 +501,7 @@
     ).join('');
 
     const svg =
-      `<svg id="chart-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block" xmlns="http://www.w3.org/2000/svg">
+      `<svg id="chart-svg" width="100%" height="${H}" style="display:block" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#00e060" stop-opacity="0.22"/>
@@ -556,6 +560,14 @@
     if (hdot)  hdot.setAttribute('display', 'none');
     document.getElementById('tooltip').style.display = 'none';
   }
+
+  let _chartResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_chartResizeTimer);
+    _chartResizeTimer = setTimeout(() => {
+      if (_chartHist.length) renderChart(_chartHist);
+    }, 100);
+  });
 </script>
 </body>
 </html>
