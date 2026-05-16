@@ -958,9 +958,20 @@ Alex Horne</textarea>
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
       const hasMergeAssignment = allMergeAssignments.some(a => a.episode_uid === ep.episode_uid);
       return `<div class="episode-row${ep.has_merged ? ' merged' : hasMergeAssignment ? ' merge-assigned' : ''}">
-        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${lockBadge}</div>
+        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${ep.has_merged && ep.merged_version_uid ? `<button class="copy-id-btn" onclick="downloadMerged(${escHtml(JSON.stringify(ep.merged_version_uid))},'S${ep.season_number}E${ep.episode_number}_${escHtml(ep.youtube_id||'')}.json')" title="Download merged transcript">↓</button>` : ''}${lockBadge}</div>
         <div class="episode-users">${users}</div>
       </div>`;
+    }
+
+    async function downloadMerged(versionUid, filename) {
+      const res = await fetch(`./transcripts.py?version=${encodeURIComponent(versionUid)}`);
+      if (!res.ok) { alert('Download failed'); return; }
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
     }
 
     function renderEpisodesWithUsers(episodes) {

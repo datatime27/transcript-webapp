@@ -144,7 +144,8 @@ def get_episodes_with_user_versions():
                       (SELECT app_version        FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
                       (SELECT caption_count      FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
                       (SELECT modified_count     FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
-                      (SELECT latest_modification FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1)
+                      (SELECT latest_modification FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
+                      (SELECT v3.uid FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1)
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -165,6 +166,7 @@ def get_episodes_with_user_versions():
                     "season_number":     row[8],
                     "episode_number":    row[9],
                     "has_merged":        bool(row[12]),
+                    "merged_version_uid": row[23],
                     "season_complete":   bool(row[13]),
                     "season_uid":        row[18],
                     "users":             [],
