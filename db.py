@@ -145,7 +145,9 @@ def get_episodes_with_user_versions():
                       (SELECT caption_count      FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
                       (SELECT modified_count     FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
                       (SELECT latest_modification FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
-                      (SELECT v3.uid FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1)
+                      (SELECT v3.uid        FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1),
+                      (SELECT v3.user_uid   FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1),
+                      (SELECT v3.created_at FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1)
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -165,8 +167,10 @@ def get_episodes_with_user_versions():
                     "show_name":         row[7],
                     "season_number":     row[8],
                     "episode_number":    row[9],
-                    "has_merged":        bool(row[12]),
-                    "merged_version_uid": row[23],
+                    "has_merged":          bool(row[12]),
+                    "merged_version_uid":  row[23],
+                    "merged_by_user_uid":  row[24],
+                    "merged_at":           row[25].replace(tzinfo=_EASTERN).isoformat() if row[25] else None,
                     "season_complete":   bool(row[13]),
                     "season_uid":        row[18],
                     "users":             [],
@@ -933,12 +937,19 @@ def remove_merge_assignment(user_uid, episode_uid):
 
 
 def get_all_merge_assignments():
-    """Return all merge assignments as [{user_uid, episode_uid}]."""
+    """Return all merge assignments as [{user_uid, episode_uid, created_at}]."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT user_uid, episode_uid FROM merge_assignments")
-        return [{"user_uid": row[0], "episode_uid": row[1]} for row in cur.fetchall()]
+        cur.execute("SELECT user_uid, episode_uid, created_at FROM merge_assignments")
+        return [
+            {
+                "user_uid":   row[0],
+                "episode_uid": row[1],
+                "created_at":  row[2].replace(tzinfo=_EASTERN).isoformat() if row[2] else None,
+            }
+            for row in cur.fetchall()
+        ]
     finally:
         conn.close()
 

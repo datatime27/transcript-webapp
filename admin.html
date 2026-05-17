@@ -390,6 +390,17 @@
       font-weight: 600;
       vertical-align: middle;
     }
+    .merge-assignee-badge {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 0.72rem;
+      background: #3a2e00;
+      color: #f0c000;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-weight: 600;
+      vertical-align: middle;
+    }
 
     .episode-user-tag-wrapper { display: inline-flex; align-items: stretch; }
     .episode-user-tag-wrapper .episode-user-tag.unstarted { border-radius: 4px 0 0 4px; }
@@ -956,9 +967,26 @@ Alex Horne</textarea>
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
-      const hasMergeAssignment = allMergeAssignments.some(a => a.episode_uid === ep.episode_uid);
+      const mergeAssignment = allMergeAssignments.find(a => a.episode_uid === ep.episode_uid);
+      const hasMergeAssignment = !!mergeAssignment;
+      let mergeBadge = '';
+      if (ep.has_merged) {
+        const mergedByUser = ep.merged_by_user_uid ? allUsers.find(u => u.uid === ep.merged_by_user_uid) : null;
+        const mergedName = mergedByUser ? mergedByUser.name : (ep.merged_by_user_uid || '');
+        const mergedDate = ep.merged_at
+          ? ' · ' + new Date(ep.merged_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+          : '';
+        mergeBadge = `<span class="merge-assignee-badge" style="background:#003a00;color:#66cc66">Merged: ${escHtml(mergedName)}${escHtml(mergedDate)}</span>`;
+      } else if (mergeAssignment) {
+        const mergeAssignee = allUsers.find(u => u.uid === mergeAssignment.user_uid);
+        const assigneeName = mergeAssignee ? mergeAssignee.name : mergeAssignment.user_uid;
+        const assignedDate = mergeAssignment.created_at
+          ? ' · ' + new Date(mergeAssignment.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+          : '';
+        mergeBadge = `<span class="merge-assignee-badge">Merge: ${escHtml(assigneeName)}${escHtml(assignedDate)}</span>`;
+      }
       return `<div class="episode-row${ep.has_merged ? ' merged' : hasMergeAssignment ? ' merge-assigned' : ''}">
-        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${ep.has_merged && ep.merged_version_uid ? `<button class="copy-id-btn" onclick="downloadMerged(${escHtml(JSON.stringify(ep.merged_version_uid))},'S${ep.season_number}E${ep.episode_number}_${escHtml(ep.youtube_id||'')}.json')" title="Download merged transcript">↓</button>` : ''}${lockBadge}</div>
+        <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${ep.has_merged && ep.merged_version_uid ? `<button class="copy-id-btn" onclick="downloadMerged(${escHtml(JSON.stringify(ep.merged_version_uid))},'S${ep.season_number}E${ep.episode_number}_${escHtml(ep.youtube_id||'')}.json')" title="Download merged transcript">↓</button>` : ''}${lockBadge}${mergeBadge}</div>
         <div class="episode-users">${users}</div>
       </div>`;
     }
