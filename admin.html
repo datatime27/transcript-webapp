@@ -706,6 +706,12 @@ Alex Horne</textarea>
     <textarea id="sp-output" readonly style="display:none;width:100%;font-family:monospace;font-size:0.85rem;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:5px;padding:10px 12px;resize:vertical;"></textarea>
   </div>
 
+  <!-- Episode History -->
+  <div class="section">
+    <h2>Episode History</h2>
+    <button class="btn-small" onclick="downloadEpisodeHistory(this)">Download JSON</button>
+  </div>
+
   </div><!-- /tab-seasons -->
 
 <script>
@@ -1654,6 +1660,29 @@ Alex Horne</textarea>
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
       });
+    }
+
+    async function downloadEpisodeHistory(btn) {
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Downloading…';
+      try {
+        const res  = await fetch(`./admin.py?user=${userUid}&action=episode_history`);
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed to load history'); return; }
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'episode_history.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Error downloading history.');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = orig;
+      }
     }
 
     function clearResult(id) {

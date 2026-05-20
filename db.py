@@ -1008,6 +1008,90 @@ def set_episode_complete(youtube_id, user_uid):
         conn.close()
 
 
+def get_episode_history():
+    """Return all episode lifecycle events sorted newest-first.
+
+    Event types:
+      episode_registered — original transcript import (MIN version created_at where user_uid IS NULL)
+      assigned           — user_episodes.created_at (non-admin, non-test users)
+      completed          — MAX version created_at for completed user-episodes (proxy for done-save timestamp)
+      merged             — version created_at where is_merged=1
+    """
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ts, event_type, show_name, season_number, episode_number
+            FROM (
+                SELECT MIN(v.created_at)       AS ts,
+                       'episode_registered'    AS event_type,
+                       sh.name                 AS show_name,
+                       se.number               AS season_number,
+                       e.number                AS episode_number
+                FROM versions v
+                JOIN episodes e  ON e.uid  = v.episode_uid
+                JOIN seasons  se ON se.uid = e.season_uid
+                JOIN shows    sh ON sh.uid = se.show_uid
+                WHERE v.user_uid IS NULL
+                GROUP BY v.episode_uid, sh.name, se.number, e.number
+
+                UNION ALL
+
+                SELECT ue.created_at,
+                       'assigned',
+                       sh.name, se.number, e.number
+                FROM user_episodes ue
+                JOIN users    u  ON u.uid  = ue.user_uid
+                JOIN episodes e  ON e.uid  = ue.episode_uid
+                JOIN seasons  se ON se.uid = e.season_uid
+                JOIN shows    sh ON sh.uid = se.show_uid
+                WHERE COALESCE(u.is_admin, 0) = 0
+                  AND COALESCE(u.is_test_account, 0) = 0
+
+                UNION ALL
+
+                SELECT MAX(v.created_at),
+                       'completed',
+                       sh.name, se.number, e.number
+                FROM user_episodes ue
+                JOIN users    u  ON u.uid        = ue.user_uid
+                JOIN versions v  ON v.user_uid   = ue.user_uid
+                                AND v.episode_uid = ue.episode_uid
+                JOIN episodes e  ON e.uid        = ue.episode_uid
+                JOIN seasons  se ON se.uid       = e.season_uid
+                JOIN shows    sh ON sh.uid       = se.show_uid
+                WHERE ue.is_complete = 1
+                  AND COALESCE(u.is_admin, 0) = 0
+                  AND COALESCE(u.is_test_account, 0) = 0
+                GROUP BY ue.user_uid, ue.episode_uid, sh.name, se.number, e.number
+
+                UNION ALL
+
+                SELECT v.created_at,
+                       'merged',
+                       sh.name, se.number, e.number
+                FROM versions v
+                JOIN episodes e  ON e.uid  = v.episode_uid
+                JOIN seasons  se ON se.uid = e.season_uid
+                JOIN shows    sh ON sh.uid = se.show_uid
+                WHERE v.is_merged = 1
+            ) t
+            ORDER BY ts ASC
+        """)
+        return [
+            {
+                "timestamp":      row[0].replace(tzinfo=_EASTERN).isoformat() if row[0] else None,
+                "event_type":     row[1],
+                "show_name":      row[2],
+                "season_number":  row[3],
+                "episode_number": row[4],
+            }
+            for row in cur.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
 def populate_transcript(json_path, show_name, season_number, episode_number, user_uid=None):
     """
     Register a transcript JSON file in the database.

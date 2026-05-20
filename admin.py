@@ -36,6 +36,7 @@ from db import (
     get_reapply_data, get_user_latency, get_merged_contributors,
     add_merge_assignment, remove_merge_assignment,
     get_all_merge_assignments, get_mergeable_episodes,
+    get_episode_history,
 )
 from annotation_utils import apply_annotations
 from mail import send_email
@@ -178,6 +179,10 @@ def action_check_altered_cc(compare_text=False):
                 results[version_uid] = altered_cc
 
     return "200 OK", json.dumps(results)
+
+
+def action_episode_history():
+    return "200 OK", json.dumps(get_episode_history(), ensure_ascii=False)
 
 
 def action_scan_transcripts():
@@ -448,6 +453,8 @@ try:
         elif action == "check_altered_cc":
             compare_text = params.get("compare_text", ["0"])[0] == "1"
             status, body = action_check_altered_cc(compare_text=compare_text)
+        elif action == "episode_history":
+            status, body = action_episode_history()
         else:
             status, body = action_load_data()
 
