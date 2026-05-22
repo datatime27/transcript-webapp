@@ -245,7 +245,7 @@
 
 <script>
   const SHOWS = [
-    { name: 'Taskmaster UK', seasons: 21 },
+    { name: 'Taskmaster UK', seasons: 21, episodeCounts: { 4: 8, 5: 8 } },
     { name: 'Taskmaster AU', seasons: 4  },
     { name: 'Taskmaster NZ', seasons: 6  },
   ];
@@ -359,7 +359,8 @@
       const rows = [];
       for (let s = 1; s <= show.seasons; s++) {
         const eps = [];
-        for (let e = 1; e <= EPS_PER_SEASON; e++) {
+        const epCount = show.episodeCounts?.[s] ?? EPS_PER_SEASON;
+        for (let e = 1; e <= epCount; e++) {
           const ep = dbMap.get(`${show.name}|${s}|${e}`) || {
             __missing: true, show_name: show.name, season_number: s, episode_number: e,
           };
