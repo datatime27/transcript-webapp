@@ -96,8 +96,8 @@ try:
                     merge_date = merge_date.date()
                 merges[ep_uid] = merge_date
 
-            # (21+4+6) shows * 10 episodes — must match SHOWS in dashboard.html
-            GRID_TOTAL = 310
+            # UK S1-5: 6+5+5+8+8=32, S6-21: 160; AU: 40; NZ: 60 — must match SHOWS in dashboard.html
+            GRID_TOTAL = 292
             all_ep_uids = set(completions) | set(merges)
             history = []
             for days_ago in range(27, -1, -1):

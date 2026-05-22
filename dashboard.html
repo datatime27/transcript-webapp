@@ -285,12 +285,9 @@
   }
 
   function seasonStats(eps) {
-    let total = 0, done = 0;
+    let total = eps.length, done = 0;
     for (const ep of eps) {
-      if (ep.__missing || !ep.user_count) continue;
-      total++;
-      const s = tileStatus(ep);
-      if (s === 'green') done++;
+      if (tileStatus(ep) === 'green') done++;
     }
     return { total, done };
   }
@@ -326,7 +323,7 @@
       }
     }
     const pct      = total ? (earned / total * 100) : 0;
-    const pctStr   = pct.toFixed(1);
+    const pctStr   = pct.toFixed(2);
     const earnedStr = earned.toFixed(1);
 
     document.getElementById('progress-container').innerHTML =
