@@ -109,6 +109,7 @@ try:
                         "user_uid":       uv["user_uid"],
                         "version_uid":    uv["version_uid"],
                         "version_number": uv["version_number"],
+                        "created_at":     uv["created_at"],
                         "captions":       captions,
                     })
 

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcript Diff</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 18px; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Load screen ──────────────────────────────────────────────────────── */
+
+    #load-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #load-screen h1 { font-size: 1.5rem; color: #fff; }
+    #load-screen p  { color: #888; font-size: 0.9rem; }
+
+    #episode-select {
+      padding: 10px 14px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      min-width: 360px;
+      cursor: pointer;
+    }
+
+    .btn {
+      padding: 10px 24px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #cc0000; }
+    .btn:disabled { background: #555; cursor: default; }
+
+    .btn-subtle {
+      padding: 6px 14px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .btn-subtle:hover { background: #3a3a3a; }
+
+    #error-msg {
+      color: #f66;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    /* ── Diff screen ──────────────────────────────────────────────────────── */
+
+    #diff-screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #diff-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: #141414;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    #diff-header h2 {
+      font-size: 1rem;
+      color: #fff;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    #diff-count {
+      font-size: 0.85rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    #show-agreed-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: #aaa;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #diff-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #player-panel {
+      flex: 0 0 40%;
+      background: #000;
+      width: 100%;
+      min-height: 10%;
+      max-height: 90%;
+      position: relative;
+    }
+
+    #player-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    #player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #panel-splitter {
+      height: 5px;
+      cursor: row-resize;
+      background: #58b6b5;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #panel-splitter:hover, #panel-splitter.dragging { background: #555; }
+
+    #table-wrap {
+      flex: 1;
+      overflow: auto;
+      width: 100%;
+      min-height: 10%;
+    }
+
+    /* ── Diff table ───────────────────────────────────────────────────────── */
+
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .diff-table th {
+      background: #1a1a1a;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid #333;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .diff-table th.col-version {
+      color: #aae;
+      font-weight: 600;
+      min-width: 160px;
+    }
+
+    .th-ver-num {
+      font-size: 0.72rem;
+      color: #666;
+      font-weight: normal;
+      margin-left: 4px;
+    }
+
+    .diff-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #1e1e1e;
+      vertical-align: top;
+    }
+
+    .col-time {
+      white-space: nowrap;
+      font-size: 0.8rem;
+      width: 58px;
+      cursor: pointer;
+      vertical-align: middle !important;
+    }
+    .col-time:hover { color: #e0e0e0; }
+
+    /* Per-version cells */
+    .diff-cell { min-width: 160px; }
+
+    .dc-text {
+      display: block;
+      color: #ccc;
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .dc-speaker {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #8af;
+      letter-spacing: 0.02em;
+    }
+
+    .dc-m {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #4a8;
+      margin-left: 4px;
+    }
+
+    .dc-missing {
+      color: #3a3a3a;
+      font-style: italic;
+    }
+
+    /* Minority-value highlighting on differing rows */
+    .dc-text.differs   { color: #fa8; }
+    .dc-speaker.differs { color: #f88; }
+
+    /* Row states */
+    .row-diff { background: #141410; }
+    .row-diff td { border-bottom-color: #2a2a20; }
+
+    .row-agreed { opacity: 0.35; }
+    .row-agreed.show-agreed { opacity: 1; }
+    .row-agreed.show-agreed .dc-text { color: #888; }
+
+    /* Active (navigated-to) diff row */
+    .row-active { background: #1a0000 !important; }
+    .row-active td:first-child { border-left: 3px solid #c00; }
+  </style>
+</head>
+<body>
+
+  <!-- Load screen -->
+  <div id="load-screen">
+    <h1>Transcript Diff</h1>
+    <p>Compare all user versions of an episode side by side.</p>
+    <select id="episode-select"><option value="">Loading episodes…</option></select>
+    <button class="btn" onclick="compare()">Compare</button>
+    <p id="error-msg"></p>
+  </div>
+
+  <!-- Diff screen -->
+  <div id="diff-screen">
+    <div id="diff-header">
+      <h2 id="episode-title"></h2>
+      <span id="diff-count"></span>
+      <button class="btn-subtle" onclick="jumpToDiff(-1)" title="Previous difference (↑ or A)">↑ Prev diff</button>
+      <button class="btn-subtle" onclick="jumpToDiff(1)" title="Next difference (↓ or Z)">↓ Next diff</button>
+      <label id="show-agreed-label">
+        <input type="checkbox" id="show-agreed" onchange="toggleAgreed()" /> Show agreed
+      </label>
+    </div>
+    <div id="diff-main">
+      <div id="player-panel">
+        <div id="player-container">
+          <div id="player"></div>
+        </div>
+      </div>
+      <div id="panel-splitter"></div>
+      <div id="table-wrap">
+        <table class="diff-table">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params             = new URLSearchParams(location.search);
+    const userUid            = params.get('user');
+    const preselectedEpisode = params.get('episode');
+
+    if (!userUid) {
+      document.getElementById('error-msg').textContent = 'Missing required URL parameter: user';
+      document.getElementById('error-msg').style.display = 'block';
+      document.querySelector('.btn').disabled = true;
+      document.getElementById('episode-select').disabled = true;
+    } else if (preselectedEpisode) {
+      compare(preselectedEpisode);
+    } else {
+      loadEpisodes();
+    }
+
+    let episodeData     = null;
+    let unifiedCaptions = [];
+    let ytPlayer        = null;
+    let diffIndices     = [];  // indices of rows with any disagreement
+    let activeDiffIndex = -1;
+    let activeRow       = null;
+
+    // ── Data loading ─────────────────────────────────────────────────────────
+
+    async function loadEpisodes() {
+      const res  = await fetch(`./merge.py?user=${userUid}`);
+      const data = await res.json();
+      const sel  = document.getElementById('episode-select');
+      if (!res.ok) {
+        sel.innerHTML = '<option value="">Error loading episodes</option>';
+        showError(data.error || 'Failed to load episodes');
+        return;
+      }
+      if (!data.length) {
+        sel.innerHTML = '<option value="">No episodes ready to compare</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">Select an episode…</option>';
+      data.forEach(ep => {
+        const opt = document.createElement('option');
+        opt.value = ep.episode_uid;
+        opt.textContent = decodeHtml(ep.title);
+        sel.appendChild(opt);
+      });
+    }
+
+    async function compare(episodeUidOverride) {
+      const episodeUid = episodeUidOverride || document.getElementById('episode-select').value;
+      if (!episodeUid) return;
+
+      showError('');
+      const loadBtn = document.querySelector('#load-screen .btn');
+      if (!episodeUidOverride) {
+        loadBtn.textContent = 'Loading…';
+        loadBtn.disabled = true;
+      }
+
+      const res  = await fetch(`./merge.py?episode=${episodeUid}&user=${userUid}`);
+      const data = await res.json();
+
+      if (!episodeUidOverride) {
+        loadBtn.textContent = 'Compare';
+        loadBtn.disabled = false;
+      }
+
+      if (!res.ok) { showError(data.error || 'Failed to load versions'); return; }
+      if (data.versions.length < 2) { showError('Need at least 2 user versions to compare.'); return; }
+
+      // Normalise speaker strings
+      const _norm = s => s.replace(/[​‌‍﻿­]/g, '').normalize('NFC').trim();
+      data.versions.forEach(v => v.captions.forEach(cap => {
+        if (cap.speaker) cap.speaker = _norm(cap.speaker);
+      }));
+
+      // Sort versions oldest → newest by created_at from the DB
+      data.versions.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+
+      episodeData     = data;
+      unifiedCaptions = buildUnifiedCaptions(data.versions);
+      document.getElementById('episode-title').textContent = decodeHtml(data.title || '');
+      renderDiff();
+      document.getElementById('load-screen').style.display = 'none';
+      document.getElementById('diff-screen').style.display = 'flex';
+      initPlayer(data.youtube_id);
+    }
+
+    // ── Caption alignment ────────────────────────────────────────────────────
+
+    function buildUnifiedCaptions(versions) {
+      const parseStart = cap => parseFloat(String(cap.start || '').trim().replace(/s$/, '')) || 0;
+      // Normalise key to float so different string formats match (e.g. "    10.00s" and 10.0)
+      const keyOf = cap => Math.round(parseStart(cap) * 1000) / 1000;
+
+      const map = new Map();
+      versions.forEach((v, vi) => {
+        v.captions.forEach(cap => {
+          const k = keyOf(cap);
+          if (!map.has(k)) {
+            map.set(k, { start: cap.start, perVersion: new Array(versions.length).fill(null) });
+          }
+          map.get(k).perVersion[vi] = cap;
+        });
+      });
+
+      return Array.from(map.values()).sort((a, b) => parseStart(a) - parseStart(b));
+    }
+
+    // ── Rendering ────────────────────────────────────────────────────────────
+
+    function renderDiff() {
+      const versions   = episodeData.versions;
+      const showAgreed = document.getElementById('show-agreed').checked;
+
+      // Header
+      const thead = document.getElementById('thead');
+      thead.innerHTML = '';
+      const headerRow = document.createElement('tr');
+      headerRow.innerHTML =
+        '<th class="col-time">Time</th>' +
+        versions.map(v => {
+          const href = `viewer-2.0.html?user=${encodeURIComponent(v.user_uid)}&episode=${encodeURIComponent(episodeData.episode_uid)}`;
+          return `<th class="col-version diff-cell"><a href="${escHtml(href)}" target="_blank" style="color:inherit;text-decoration:none;" title="Open in viewer">${escHtml(v.user_name)}</a><span class="th-ver-num">v${v.version_number}</span></th>`;
+        }).join('');
+      thead.appendChild(headerRow);
+
+      // Body
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      diffIndices     = [];
+      activeDiffIndex = -1;
+      activeRow       = null;
+
+      unifiedCaptions.forEach((row, i) => {
+        const present  = row.perVersion.filter(c => c !== null);
+        const speakers = present.map(c => c.speaker);
+        const texts    = present.map(c => c.text || '');
+
+        const speakerAgreed = present.length <= 1 || speakers.every(s => s === speakers[0]);
+        const textAgreed    = present.length <= 1 || texts.every(t => t === texts[0]);
+        const allPresent    = present.length === versions.length;
+        const agreed        = speakerAgreed && textAgreed && allPresent;
+
+        if (!agreed) diffIndices.push(i);
+        tbody.appendChild(buildRow(i, agreed, showAgreed, speakerAgreed, textAgreed, present));
+      });
+
+      const el = document.getElementById('diff-count');
+      el.textContent = diffIndices.length === 0
+        ? 'No differences'
+        : `${diffIndices.length} row${diffIndices.length === 1 ? '' : 's'} differ`;
+    }
+
+    function buildRow(i, agreed, showAgreed, speakerAgreed, textAgreed, present) {
+      const unified = unifiedCaptions[i];
+      const baseCap = unified.perVersion.find(c => c !== null);
+      const tr      = document.createElement('tr');
+      tr.dataset.index = i;
+      tr.className = agreed
+        ? ('row-agreed' + (showAgreed ? ' show-agreed' : ''))
+        : 'row-diff';
+
+      // Compute majority speaker and text for minority-cell highlighting
+      let majSpeaker = null;
+      if (!speakerAgreed) {
+        const counts = {};
+        present.forEach(c => { counts[c.speaker] = (counts[c.speaker] || 0) + 1; });
+        const max     = Math.max(...Object.values(counts));
+        const winners = Object.keys(counts).filter(k => counts[k] === max);
+        if (winners.length === 1) majSpeaker = winners[0];
+      }
+
+      let majText = null;
+      if (!textAgreed) {
+        const counts = {};
+        present.forEach(c => { const t = c.text || ''; counts[t] = (counts[t] || 0) + 1; });
+        const max     = Math.max(...Object.values(counts));
+        const winners = Object.keys(counts).filter(k => counts[k] === max);
+        if (winners.length === 1) majText = winners[0];
+      }
+
+      const seconds = parseFloat(String(baseCap.start || '').trim().replace('s', ''));
+      const mm = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const ss = Math.floor(seconds % 60).toString().padStart(2, '0');
+
+      let cells = `<td class="col-time" onclick="seekTo(${seconds})">${mm}:${ss}</td>`;
+
+      unified.perVersion.forEach(cap => {
+        if (cap === null) {
+          cells += `<td class="diff-cell"><span class="dc-missing">—</span></td>`;
+          return;
+        }
+
+        const speakerDiffers = !speakerAgreed && (majSpeaker === null || cap.speaker !== majSpeaker);
+        const textDiffers    = !textAgreed    && (majText    === null || (cap.text || '') !== majText);
+        const spCls          = 'dc-speaker' + (speakerDiffers ? ' differs' : '');
+        const txCls          = 'dc-text'    + (textDiffers    ? ' differs' : '');
+        const mBadge         = cap.modified ? '<span class="dc-m">M</span>' : '';
+
+        cells += `<td class="diff-cell"><span class="${txCls}">${escHtml(cap.text || '')}</span><span class="${spCls}">${escHtml(cap.speaker)}${mBadge}</span></td>`;
+      });
+
+      tr.innerHTML = cells;
+      return tr;
+    }
+
+    // ── Navigation ───────────────────────────────────────────────────────────
+
+    function toggleAgreed() {
+      const show = document.getElementById('show-agreed').checked;
+      document.querySelectorAll('.row-agreed').forEach(tr => {
+        tr.classList.toggle('show-agreed', show);
+      });
+    }
+
+    function setActiveDiff(idx) {
+      activeDiffIndex = idx;
+      if (activeRow) activeRow.classList.remove('row-active');
+      const captionIndex = diffIndices[idx];
+      if (captionIndex == null) { activeRow = null; return; }
+      activeRow = document.querySelector(`tr[data-index="${captionIndex}"]`);
+      if (!activeRow) return;
+      activeRow.classList.add('row-active');
+      activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    function jumpToDiff(direction) {
+      if (!diffIndices.length) return;
+      const next = activeDiffIndex + direction;
+      if (next < 0) setActiveDiff(diffIndices.length - 1);
+      else if (next >= diffIndices.length) setActiveDiff(0);
+      else setActiveDiff(next);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.contentEditable === 'true') return;
+      if (e.key === ' ') {
+        e.preventDefault();
+        if (ytPlayer) {
+          const state = ytPlayer.getPlayerState();
+          if (state === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
+          else ytPlayer.playVideo();
+        }
+      }
+      else if (e.key === 'ArrowDown' || e.key === 'z') { e.preventDefault(); jumpToDiff(1); }
+      else if (e.key === 'ArrowUp'   || e.key === 'a') { e.preventDefault(); jumpToDiff(-1); }
+    });
+
+    // ── YouTube player ───────────────────────────────────────────────────────
+
+    function seekTo(seconds) {
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        ytPlayer.seekTo(seconds, true);
+        ytPlayer.playVideo();
+      }
+    }
+
+    function loadYouTubeAPI() {
+      return new Promise(resolve => {
+        if (window.YT && window.YT.Player) { resolve(); return; }
+        window.onYouTubeIframeAPIReady = resolve;
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      });
+    }
+
+    async function initPlayer(videoId) {
+      await loadYouTubeAPI();
+      if (ytPlayer) { try { ytPlayer.destroy(); } catch {} ytPlayer = null; }
+      ytPlayer = new YT.Player('player', {
+        videoId,
+        playerVars: { rel: 0, modestbranding: 1 },
+      });
+    }
+
+    // ── Panel splitter ───────────────────────────────────────────────────────
+
+    (function () {
+      const splitter    = document.getElementById('panel-splitter');
+      const playerPanel = document.getElementById('player-panel');
+      const diffMain    = document.getElementById('diff-main');
+
+      const dragShield = document.createElement('div');
+      dragShield.style.cssText = 'position:absolute;inset:0;z-index:10;display:none;';
+      playerPanel.appendChild(dragShield);
+
+      splitter.addEventListener('mousedown', e => {
+        e.preventDefault();
+        splitter.classList.add('dragging');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        dragShield.style.display = 'block';
+
+        function onMouseMove(e) {
+          const rect = diffMain.getBoundingClientRect();
+          const pct  = ((e.clientY - rect.top) / rect.height) * 100;
+          playerPanel.style.flex = `0 0 ${Math.min(90, Math.max(10, pct))}%`;
+        }
+
+        function onMouseUp() {
+          splitter.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          dragShield.style.display = 'none';
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    })();
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent   = msg;
+      el.style.display = msg ? 'block' : 'none';
+    }
+
+    function decodeHtml(str) {
+      const el = document.createElement('textarea');
+      el.innerHTML = str;
+      return el.value;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

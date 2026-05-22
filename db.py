@@ -562,7 +562,7 @@ def get_user_versions_for_episode(episode_uid):
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT u.name, v.uid, v.version_number, v.filepath, v.user_uid
+            """SELECT u.name, v.uid, v.version_number, v.filepath, v.user_uid, v.created_at
                FROM versions v
                JOIN users u ON u.uid = v.user_uid
                JOIN (
@@ -577,7 +577,8 @@ def get_user_versions_for_episode(episode_uid):
             (episode_uid, episode_uid),
         )
         return [
-            {"user_name": row[0], "version_uid": row[1], "version_number": row[2], "filepath": row[3], "user_uid": row[4]}
+            {"user_name": row[0], "version_uid": row[1], "version_number": row[2], "filepath": row[3], "user_uid": row[4],
+             "created_at": row[5].isoformat() if row[5] else None}
             for row in cur.fetchall()
         ]
     finally:
