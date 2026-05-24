@@ -318,10 +318,11 @@ def action_add_episode_to_user(data):
 def action_remove_episode_from_user(data):
     user_uid    = str(data.get("user_uid",    "") or "").strip()
     episode_uid = str(data.get("episode_uid", "") or "").strip()
+    force       = bool(data.get("force", False))
     if not user_uid or not episode_uid:
         return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
     try:
-        remove_episode_from_user(user_uid, episode_uid)
+        remove_episode_from_user(user_uid, episode_uid, force=force)
         return "200 OK", json.dumps({"ok": True})
     except ValueError as e:
         return "409 Conflict", json.dumps({"error": str(e)})
