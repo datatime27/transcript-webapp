@@ -989,7 +989,7 @@ Alex Horne</textarea>
         const assignedDate = mergeAssignment.created_at
           ? ' · ' + new Date(mergeAssignment.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
           : '';
-        mergeBadge = `<span class="merge-assignee-badge">Merge: ${escHtml(assigneeName)}${escHtml(assignedDate)}</span>`;
+        mergeBadge = `<span class="merge-assignee-badge">Merge: ${escHtml(assigneeName)}${escHtml(assignedDate)}<button class="unassign-btn" style="margin-left:6px;font-size:0.7rem;padding:0 4px" onclick="removeMergeAssignment(${escHtml(JSON.stringify(mergeAssignment.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))})" title="Remove merge assignment">×</button></span>`;
       }
       return `<div class="episode-row${ep.has_merged ? ' merged' : hasMergeAssignment ? ' merge-assigned' : ''}">
         <div class="episode-title"><a class="episode-merge-link" href="merge.html?user=${encodeURIComponent(userUid)}&episode=${encodeURIComponent(ep.episode_uid || '')}" target="_blank">S${ep.season_number} E${ep.episode_number}</a> <a class="episode-youtube-id" href="https://www.youtube.com/watch?v=${escHtml(ep.youtube_id || '')}" target="_blank">${escHtml(ep.youtube_id || '')}</a><button class="copy-id-btn" onclick="navigator.clipboard.writeText(${escHtml(JSON.stringify(ep.youtube_id || ''))});this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" title="Copy ID">⧉</button>${ep.has_merged && ep.merged_version_uid ? `<button class="copy-id-btn" onclick="downloadMerged(${escHtml(JSON.stringify(ep.merged_version_uid))},'S${ep.season_number}E${ep.episode_number}_${escHtml(ep.youtube_id||'')}.json')" title="Download merged transcript">↓</button>` : ''}${lockBadge}${mergeBadge}</div>
@@ -1406,10 +1406,7 @@ Alex Horne</textarea>
       const episodeMap = Object.fromEntries(allMergeableEpisodes.map(e => [e.episode_uid, e.title]));
       container.innerHTML = assigned.map(epUid => {
         const title = episodeMap[epUid] || epUid;
-        return `<div class="am-existing-row">
-          <span>${escHtml(title)}</span>
-          <button class="am-remove-btn" onclick="removeMergeAssignment(${escHtml(JSON.stringify(userUid))}, ${escHtml(JSON.stringify(epUid))})">×</button>
-        </div>`;
+        return `<div class="am-existing-row"><span>${escHtml(title)}</span></div>`;
       }).join('');
     }
 
