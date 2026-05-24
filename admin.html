@@ -381,6 +381,9 @@
       border-color: #00ccaa;
       box-shadow: 0 0 5px #00ccaa55;
     }
+    .episode-user-tag-wrapper:has(.ready-review) .download-btn {
+      border-color: #00ccaa;
+    }
 
     .lock-badge {
       display: inline-block;
@@ -404,6 +407,20 @@
 
     .episode-user-tag-wrapper { display: inline-flex; align-items: stretch; }
     .episode-user-tag-wrapper .episode-user-tag.unstarted { border-radius: 4px 0 0 4px; }
+    .episode-user-tag-wrapper .episode-user-tag.completed { border-radius: 4px 0 0 4px; }
+    .download-btn {
+      font-size: 0.75rem;
+      padding: 0 5px;
+      margin-left: -1px;
+      background: #1a4d22;
+      color: #9ee8a0;
+      border: 1px solid #276630;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .download-btn:hover { background: #215c2a; color: #c0ffc0; }
     .unassign-btn {
       font-size: 0.75rem;
       padding: 0 5px;
@@ -968,6 +985,10 @@ Alex Horne</textarea>
             const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}${createdAtAttr}${modifiedAttr}${totalAttr}${lastModAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}</a>`;
             if (u.version_number == null) {
               return `<span class="episode-user-tag-wrapper">${tagHtml}<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this)" title="Remove assignment">×</button></span>`;
+            }
+            if (u.is_complete && u.version_uid) {
+              const dlFilename = `S${ep.season_number}E${ep.episode_number}_${ep.youtube_id || ''}_${(u.user_name || u.user_uid).replace(/[^a-zA-Z0-9_-]/g, '_')}.json`;
+              return `<span class="episode-user-tag-wrapper">${tagHtml}<button class="download-btn" onclick="downloadMerged(${escHtml(JSON.stringify(u.version_uid))},${escHtml(JSON.stringify(dlFilename))})" title="Download transcript">↓</button></span>`;
             }
             return tagHtml;
           }).join('')
