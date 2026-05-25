@@ -93,6 +93,20 @@ Your time starts now!
 "Data Time"
 """
 
+_REMINDER_BODY = """\
+Hi {name}!
+
+It looks like **{age}** days ago you were assigned episode: **{label}** 
+{link}
+
+Please let me know if you're still able to work on it.
+If you're not longer able to work on it, no worries, I can reassign it to someone else.
+
+Thanks!
+-Peter
+"Data Time"
+"""
+
 
 def valid_id(uid):
     return uid and all(c.isalnum() or c in "-_" for c in uid)
@@ -421,6 +435,26 @@ def action_remove_merge_assignment(data):
         return "409 Conflict", json.dumps({"error": str(e)})
 
 
+def action_send_reminder(data):
+    user_uid    = str(data.get("user_uid",    "") or "").strip()
+    episode_uid = str(data.get("episode_uid", "") or "").strip()
+    if not user_uid or not episode_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
+    user    = get_user_info(user_uid)
+    episode = get_episode_info(episode_uid)
+    if not user or not episode:
+        return "404 Not Found", json.dumps({"error": "User or episode not found"})
+    age         = data.get("age_days")
+    label       = f"{episode['show_name']} S{episode['season_number']}E{episode['episode_number']}"
+    viewer_url  = f"https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user={user_uid}&episode={episode_uid}"
+    send_email(
+        to      = user["email"],
+        subject = f"{label}: Episode Reminder",
+        body    = _REMINDER_BODY.format(name=user["name"], label=label, link=viewer_url, age=age if age is not None else "?"),
+    )
+    return "200 OK", json.dumps({"ok": True})
+
+
 POST_ACTIONS = {
     "delete_test_accounts":      action_delete_test_accounts,
     "create_user":               action_create_user,
@@ -433,6 +467,7 @@ POST_ACTIONS = {
     "update_user_location":      action_update_user_location,
     "add_merge_assignment":      action_add_merge_assignment,
     "remove_merge_assignment":   action_remove_merge_assignment,
+    "send_reminder":             action_send_reminder,
 }
 
 status = "200 OK"

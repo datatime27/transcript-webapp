@@ -639,7 +639,7 @@
     <h2>User Latency</h2>
     <div class="users-table-wrap">
       <table class="users-table" id="latency-table">
-        <thead><tr><th>User</th><th>Episode</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th><th>Percent Modified</th></tr></thead>
+        <thead><tr><th>User</th><th>Episode</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th><th>Percent Modified</th><th>Remind</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -795,7 +795,7 @@ Alex Horne</textarea>
       const tbody = document.querySelector('#latency-table tbody');
       tbody.innerHTML = '';
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
         return;
       }
       const now = Date.now();
@@ -817,9 +817,26 @@ Alex Horne</textarea>
           <td style="white-space:nowrap;${ageCss}">${ageStr}</td>
           <td>${statusStr}</td>
           <td style="white-space:nowrap">${modStr}</td>
-          <td style="white-space:nowrap">${pctStr}</td>`;
+          <td style="white-space:nowrap">${pctStr}</td>
+          <td><button class="btn-small" onclick="sendReminder(this,${escHtml(JSON.stringify(r.user_uid))},${escHtml(JSON.stringify(r.episode_uid))},${ageDays === null ? 'null' : ageDays})">Remind</button></td>`;
         tbody.appendChild(tr);
       });
+    }
+
+    async function sendReminder(btn, userUid, episodeUid, ageDays) {
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      const res  = await post({ action: 'send_reminder', user_uid: userUid, episode_uid: episodeUid, age_days: ageDays });
+      const data = await res.json();
+      if (res.ok) {
+        btn.textContent = 'Sent ✓';
+        btn.style.color = '#4caf50';
+      } else {
+        btn.textContent = 'Error';
+        btn.style.color = '#f44336';
+        btn.disabled = false;
+        alert(data.error || 'Failed to send reminder');
+      }
     }
 
     async function addLocation() {
