@@ -1010,13 +1010,13 @@ Alex Horne</textarea>
             const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}${createdAtAttr}${modifiedAttr}${totalAttr}${lastModAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}</a>`;
             const unassignBtn = `<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this,${u.version_number != null})" title="Remove assignment">×</button>`;
             if (u.version_number == null) {
-              return `<span class="episode-user-tag-wrapper">${tagHtml}${unassignBtn}</span>`;
+              return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}</span>`;
             }
             if (u.is_complete && u.version_uid) {
               const dlFilename = `S${ep.season_number}E${ep.episode_number}_${ep.youtube_id || ''}_${(u.user_name || u.user_uid).replace(/[^a-zA-Z0-9_-]/g, '_')}.json`;
               return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}<button class="download-btn" onclick="downloadMerged(${escHtml(JSON.stringify(u.version_uid))},${escHtml(JSON.stringify(dlFilename))})" title="Download transcript">↓</button></span>`;
             }
-            return `<span class="episode-user-tag-wrapper">${tagHtml}${unassignBtn}</span>`;
+            return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}</span>`;
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
