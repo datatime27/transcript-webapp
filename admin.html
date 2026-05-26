@@ -394,7 +394,8 @@
       vertical-align: middle;
     }
     .merge-assignee-badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
       margin-left: 8px;
       font-size: 0.72rem;
       background: #3a2e00;
@@ -435,7 +436,8 @@
       opacity: 0;
       pointer-events: none;
     }
-    .episode-user-tag-wrapper:hover .unassign-btn {
+    .episode-user-tag-wrapper:hover .unassign-btn,
+    .merge-assignee-badge:hover .unassign-btn {
       opacity: 1;
       pointer-events: auto;
     }
