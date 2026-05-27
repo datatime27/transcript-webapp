@@ -641,7 +641,7 @@
     <h2>User Latency</h2>
     <div class="users-table-wrap">
       <table class="users-table" id="latency-table">
-        <thead><tr><th>User</th><th>Episode</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th><th>Percent Modified</th><th>Remind</th></tr></thead>
+        <thead><tr><th>User</th><th>Episode</th><th>Last Reminded</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th><th>Percent Modified</th><th>Remind</th><th>Mark as Reminded</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -797,10 +797,18 @@ Alex Horne</textarea>
       const tbody = document.querySelector('#latency-table tbody');
       tbody.innerHTML = '';
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
         return;
       }
       const now = Date.now();
+      rows.sort((a, b) => {
+        const ra = a.reminder_sent_at ? new Date(a.reminder_sent_at).getTime() : 0;
+        const rb = b.reminder_sent_at ? new Date(b.reminder_sent_at).getTime() : 0;
+        if (ra !== rb) return ra - rb;
+        const aa = a.last_save_at || a.assigned_at;
+        const ab = b.last_save_at || b.assigned_at;
+        return (aa ? new Date(aa).getTime() : 0) - (ab ? new Date(ab).getTime() : 0);
+      });
       rows.forEach(r => {
         const activityDate = r.last_save_at || r.assigned_at;
         const ageDays = activityDate ? Math.floor((now - new Date(activityDate).getTime()) / 86400000) : null;
@@ -810,19 +818,35 @@ Alex Horne</textarea>
         const statusStr = r.version_count === 0 ? '<span style="color:#888;font-style:italic">Not started</span>' : `v${r.version_count}`;
         const modStr = r.latest_modification != null ? r.latest_modification : '<span style="color:#555">—</span>';
         const pctStr = r.percent_modified != null ? `${r.percent_modified}%` : '<span style="color:#555">—</span>';
+        const remindedStr = r.reminder_sent_at ? new Date(r.reminder_sent_at).toLocaleDateString() : '<span style="color:#555">—</span>';
         const link = `viewer-2.0.html?user=${r.user_uid}&episode=${r.episode_uid}`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><a href="${link}" class="link">${escHtml(r.user_name)}</a></td>
           <td>${escHtml(r.episode_title)}</td>
+          <td class="reminded-cell" style="white-space:nowrap">${remindedStr}</td>
           <td style="white-space:nowrap">${activityStr}</td>
           <td style="white-space:nowrap;${ageCss}">${ageStr}</td>
           <td>${statusStr}</td>
           <td style="white-space:nowrap">${modStr}</td>
           <td style="white-space:nowrap">${pctStr}</td>
-          <td><button class="btn-small" onclick="sendReminder(this,${escHtml(JSON.stringify(r.user_uid))},${escHtml(JSON.stringify(r.episode_uid))},${ageDays === null ? 'null' : ageDays})">Remind</button></td>`;
+          <td><button class="btn-small" onclick="sendReminder(this,${escHtml(JSON.stringify(r.user_uid))},${escHtml(JSON.stringify(r.episode_uid))},${ageDays === null ? 'null' : ageDays})">Remind</button></td>
+          <td><button class="btn-small" onclick="markReminded(this,${escHtml(JSON.stringify(r.user_uid))},${escHtml(JSON.stringify(r.episode_uid))})">Mark</button></td>`;
         tbody.appendChild(tr);
       });
+    }
+
+    async function markReminded(btn, userUid, episodeUid) {
+      btn.disabled = true;
+      const res  = await post({ action: 'mark_reminded', user_uid: userUid, episode_uid: episodeUid });
+      const data = await res.json();
+      if (res.ok) {
+        btn.textContent = '✓';
+        btn.closest('tr').querySelector('.reminded-cell').textContent = new Date().toLocaleDateString();
+      } else {
+        btn.disabled = false;
+        alert(data.error || 'Failed to mark as reminded');
+      }
     }
 
     async function sendReminder(btn, userUid, episodeUid, ageDays) {
@@ -833,6 +857,7 @@ Alex Horne</textarea>
       if (res.ok) {
         btn.textContent = 'Sent ✓';
         btn.style.color = '#4caf50';
+        btn.closest('tr').querySelector('.reminded-cell').textContent = new Date().toLocaleDateString();
       } else {
         btn.textContent = 'Error';
         btn.style.color = '#f44336';

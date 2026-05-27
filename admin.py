@@ -33,7 +33,7 @@ from db import (
     get_user_info, get_episode_info, get_user_episode_count,
     set_season_speakers, set_season_complete,
     set_location_season, update_user_location,
-    get_reapply_data, get_user_latency, get_merged_contributors,
+    get_reapply_data, get_user_latency, set_reminder_sent, get_merged_contributors,
     add_merge_assignment, remove_merge_assignment,
     get_all_merge_assignments, get_mergeable_episodes,
     get_episode_history,
@@ -451,6 +451,16 @@ def action_send_reminder(data):
         subject = f"{label}: Episode Reminder",
         body    = _REMINDER_BODY.format(name=user["name"], label=label, link=viewer_url, age=age if age is not None else "?"),
     )
+    set_reminder_sent(user_uid, episode_uid)
+    return "200 OK", json.dumps({"ok": True})
+
+
+def action_mark_reminded(data):
+    user_uid    = str(data.get("user_uid",    "") or "").strip()
+    episode_uid = str(data.get("episode_uid", "") or "").strip()
+    if not user_uid or not episode_uid:
+        return "400 Bad Request", json.dumps({"error": "user_uid and episode_uid are required"})
+    set_reminder_sent(user_uid, episode_uid)
     return "200 OK", json.dumps({"ok": True})
 
 
@@ -467,6 +477,7 @@ POST_ACTIONS = {
     "add_merge_assignment":      action_add_merge_assignment,
     "remove_merge_assignment":   action_remove_merge_assignment,
     "send_reminder":             action_send_reminder,
+    "mark_reminded":             action_mark_reminded,
 }
 
 status = "200 OK"

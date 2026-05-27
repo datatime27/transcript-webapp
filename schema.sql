@@ -46,8 +46,9 @@ CREATE TABLE users (
 CREATE TABLE user_episodes (
     user_uid    VARCHAR(8) NOT NULL,
     episode_uid VARCHAR(8) NOT NULL,
-    is_complete TINYINT(1) DEFAULT NULL,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_complete      TINYINT(1) DEFAULT NULL,
+    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reminder_sent_at DATETIME DEFAULT NULL,
     PRIMARY KEY (user_uid, episode_uid),
     FOREIGN KEY (user_uid)    REFERENCES users(uid),
     FOREIGN KEY (episode_uid) REFERENCES episodes(uid)

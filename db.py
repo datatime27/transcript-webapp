@@ -723,7 +723,8 @@ def get_user_latency():
                       MAX(v.created_at) AS last_save, ue.created_at AS assigned_at,
                       COUNT(v.uid) AS version_count,
                       lv.filepath AS latest_filepath,
-                      lv.caption_count, lv.modified_count, lv.latest_modification
+                      lv.caption_count, lv.modified_count, lv.latest_modification,
+                      ue.reminder_sent_at
                FROM user_episodes ue
                JOIN users u ON u.uid = ue.user_uid
                JOIN episodes e ON e.uid = ue.episode_uid
@@ -748,7 +749,8 @@ def get_user_latency():
                  AND COALESCE(u.is_test_account, 0) = 0
                  AND COALESCE(season.is_complete, 0) = 0
                GROUP BY u.uid, u.name, e.uid, e.title, s.name, season.number, e.number, ue.created_at,
-                        lv.filepath, lv.caption_count, lv.modified_count, lv.latest_modification
+                        lv.filepath, lv.caption_count, lv.modified_count, lv.latest_modification,
+                        ue.reminder_sent_at
                ORDER BY COALESCE(MAX(v.created_at), ue.created_at) ASC""",
         )
         return [
@@ -767,6 +769,7 @@ def get_user_latency():
                 "caption_count":        row[11],
                 "modified_count":       row[12],
                 "latest_modification":  row[13],
+                "reminder_sent_at":     row[14].replace(tzinfo=_EASTERN).isoformat() if row[14] else None,
             }
             for row in cur.fetchall()
         ]
@@ -988,6 +991,20 @@ def set_location_season(location, season_uid):
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+def set_reminder_sent(user_uid, episode_uid):
+    """Stamp reminder_sent_at = NOW() on the user_episodes row."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE user_episodes SET reminder_sent_at = NOW() WHERE user_uid = %s AND episode_uid = %s",
+            (user_uid, episode_uid),
+        )
+        conn.commit()
     finally:
         conn.close()
 
