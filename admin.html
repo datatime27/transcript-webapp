@@ -575,16 +575,17 @@
             <th class="sortable" onclick="sortUsers('name')">Name <span class="sort-indicator" id="sort-name"></span></th>
             <th class="sortable" onclick="sortUsers('email')">Email <span class="sort-indicator" id="sort-email"></span></th>
             <th class="sortable" onclick="sortUsers('location')">Location <span class="sort-indicator" id="sort-location"></span></th>
-            <th class="sortable" onclick="sortUsers('episodes_assigned')">Episodes Assigned <span class="sort-indicator" id="sort-episodes_assigned"></span></th>
-            <th class="sortable" onclick="sortUsers('episodes_started')">Episodes Started <span class="sort-indicator" id="sort-episodes_started"></span></th>
-            <th class="sortable" onclick="sortUsers('wants_more')">Ready for Next Episode<span class="sort-indicator" id="sort-wants_more"></span></th>
+            <th class="sortable" onclick="sortUsers('episodes_assigned')">Episodes<br>Assigned <span class="sort-indicator" id="sort-episodes_assigned"></span></th>
+            <th class="sortable" onclick="sortUsers('episodes_started')">Episodes<br>Started <span class="sort-indicator" id="sort-episodes_started"></span></th>
+            <th class="sortable" onclick="sortUsers('episodes_completed')">Episodes<br>Completed <span class="sort-indicator" id="sort-episodes_completed"></span></th>
+            <th class="sortable" onclick="sortUsers('wants_more')">Ready for<br>Next Episode<span class="sort-indicator" id="sort-wants_more"></span></th>
             <th class="sortable" onclick="sortUsers('created_at')">Joined <span class="sort-indicator" id="sort-created_at"></span></th>
             <th>Link</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-tbody">
-          <tr><td colspan="9">Loading…</td></tr>
+          <tr><td colspan="10">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1232,14 +1233,14 @@ Alex Horne</textarea>
       }).join('') || '<tr><td colspan="2">No completions in the last 15 days</td></tr>';
     }
 
-    const SORT_COLS = ['name', 'email', 'location', 'episodes_assigned', 'episodes_started', 'wants_more'];
+    const SORT_COLS = ['name', 'email', 'location', 'episodes_assigned', 'episodes_started', 'episodes_completed', 'wants_more'];
 
     function sortUsers(key) {
       if (userSortKey === key) {
         userSortAsc = !userSortAsc;
       } else {
         userSortKey = key;
-        userSortAsc = key !== 'wants_more' && key !== 'episodes_assigned' && key !== 'episodes_started'; // bools/numbers default descending; strings ascending
+        userSortAsc = key !== 'wants_more' && key !== 'episodes_assigned' && key !== 'episodes_started' && key !== 'episodes_completed'; // bools/numbers default descending; strings ascending
       }
       SORT_COLS.forEach(col => {
         const el = document.getElementById(`sort-${col}`);
@@ -1319,7 +1320,7 @@ Alex Horne</textarea>
             const diff = (valB ? 1 : 0) - (valA ? 1 : 0);
             return userSortAsc ? -diff : diff;
           }
-          if (userSortKey === 'episodes_assigned' || userSortKey === 'episodes_started') {
+          if (userSortKey === 'episodes_assigned' || userSortKey === 'episodes_started' || userSortKey === 'episodes_completed') {
             const diff = (valA ?? 0) - (valB ?? 0);
             return userSortAsc ? diff : -diff;
           }
@@ -1339,6 +1340,7 @@ Alex Horne</textarea>
           <td class="loc-cell" title="Double-click to edit" ondblclick="editLocationCell(this, ${escHtml(JSON.stringify(u.uid))})">${escHtml(u.location || '—')}</td>
           <td>${u.episodes_assigned ?? '—'}</td>
           <td>${u.episodes_started ?? '—'}</td>
+          <td>${u.episodes_completed ?? '—'}</td>
           <td>${u.wants_more ? wantsMoreCell(u.uid) : ''}</td>
           <td class="text-small">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
           <td class="text-small"><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(u.uid)}" target="_blank" class="link">${escHtml(u.uid)}</a></td>
@@ -1347,7 +1349,7 @@ Alex Horne</textarea>
             <button class="btn-small" style="margin-left:4px" onclick="showAssignMergePanel(${escHtml(JSON.stringify(u.uid))}, ${escHtml(JSON.stringify(u.name || u.email))})">Assign Merge</button>
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="9">No users found</td></tr>';
+      }).join('') || '<tr><td colspan="10">No users found</td></tr>';
 
       document.getElementById('user-count').textContent = `(${allUsers.length})`;
 
@@ -1357,13 +1359,14 @@ Alex Horne</textarea>
     }
 
     document.getElementById('copy-users-tsv').addEventListener('click', async function() {
-      const headers = ['Name', 'Email', 'Location', 'Episodes Assigned', 'Episodes Started', 'Wants More', 'Joined', 'UID'];
+      const headers = ['Name', 'Email', 'Location', 'Episodes Assigned', 'Episodes Started', 'Episodes Completed', 'Wants More', 'Joined', 'UID'];
       const rows = allUsers.map(u => [
         u.name || '',
         u.email,
         u.location || '',
-        u.episodes_assigned ?? 0,
-        u.episodes_started  ?? 0,
+        u.episodes_assigned  ?? 0,
+        u.episodes_started   ?? 0,
+        u.episodes_completed ?? 0,
         u.wants_more ? '1' : '0',
         u.created_at ? new Date(u.created_at).toLocaleDateString() : '',
         u.uid,

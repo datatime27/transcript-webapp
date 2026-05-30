@@ -298,10 +298,12 @@ def get_active_users():
                    u.wants_more, u.active,
                    COUNT(DISTINCT ue.episode_uid) AS episodes_assigned,
                    COUNT(DISTINCT v.episode_uid)  AS episodes_started,
+                   COUNT(DISTINCT CASE WHEN ue2.is_complete = 1 THEN ue2.episode_uid END) AS episodes_completed,
                    u.created_at
             FROM users u
-            LEFT JOIN user_episodes ue ON ue.user_uid = u.uid
-            LEFT JOIN versions v ON v.user_uid = u.uid
+            LEFT JOIN user_episodes ue  ON ue.user_uid  = u.uid
+            LEFT JOIN versions v        ON v.user_uid   = u.uid
+            LEFT JOIN user_episodes ue2 ON ue2.user_uid = u.uid
             WHERE u.active = 1
             GROUP BY u.uid, u.email, u.name, u.is_admin, u.is_test_account, u.location, u.wants_more, u.active, u.created_at
             ORDER BY u.name
@@ -317,9 +319,10 @@ def get_active_users():
                 "location":          row[5],
                 "wants_more":        bool(row[6]),
                 "active":            bool(row[7]),
-                "episodes_assigned": row[8],
-                "episodes_started":  row[9],
-                "created_at":        row[10].replace(tzinfo=_EASTERN).isoformat() if row[10] else None,
+                "episodes_assigned":  row[8],
+                "episodes_started":   row[9],
+                "episodes_completed": row[10],
+                "created_at":         row[11].replace(tzinfo=_EASTERN).isoformat() if row[11] else None,
             }
             for row in cur.fetchall()
         ]
