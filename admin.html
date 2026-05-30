@@ -1032,7 +1032,8 @@ Alex Horne</textarea>
             const modifiedAttr  = u.modified_count != null ? ` data-modified="${u.modified_count}"` : '';
             const totalAttr     = u.caption_count  != null ? ` data-total="${u.caption_count}"` : '';
             const lastModAttr   = u.latest_modification   ? ` data-last-mod="${escHtml(u.latest_modification)}"` : '';
-            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}${createdAtAttr}${modifiedAttr}${totalAttr}${lastModAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}</a>`;
+            const appVerStr = u.latest_app_version === '2.0' ? ' (2.0)' : '';
+            const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}${createdAtAttr}${modifiedAttr}${totalAttr}${lastModAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}${appVerStr}</a>`;
             const unassignBtn = `<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this,${u.version_number != null})" title="Remove assignment">×</button>`;
             if (u.version_number == null) {
               return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}</span>`;
