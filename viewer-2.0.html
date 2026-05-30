@@ -929,6 +929,24 @@
         <input type="range" id="slomo-rate-slider" min="0.05" max="0.95" step="0.05" />
       </div>
       <div class="setting-row" style="margin-top:12px;">
+        <label style="display:flex;align-items:center;justify-content:flex-start;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="disable-auto-scroll-checkbox" />
+          Disable auto-scroll during playback
+        </label>
+      </div>
+      <div class="setting-row" style="margin-top:6px;">
+        <label style="display:flex;align-items:center;justify-content:flex-start;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="no-pause-on-speaker-checkbox" />
+          Don't pause playback when opening speaker dropdown
+        </label>
+      </div>
+      <div class="setting-row" style="margin-top:6px;">
+        <label style="display:flex;align-items:center;justify-content:flex-start;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="resume-after-speaker-checkbox" />
+          Resume playback after selecting a speaker
+        </label>
+      </div>
+      <div class="setting-row" style="margin-top:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <label>Speaker colors &amp; keys</label>
         </div>
@@ -981,6 +999,9 @@
   let slowMoKey      = localStorage.getItem('slowMoKey')      ?? DEFAULT_SLOMO_KEY;
   let slowMoRate     = parseFloat(localStorage.getItem('slowMoRate'))  || DEFAULT_SLOMO_RATE;
   let isSloMo        = false;
+  let resumeAfterSpeaker = localStorage.getItem('resumeAfterSpeaker') === 'true';
+  let noPauseOnSpeaker   = localStorage.getItem('noPauseOnSpeaker')   === 'true';
+  let disableAutoScroll  = localStorage.getItem('disableAutoScroll')  === 'true';
 
   function applySpeakerColors() {
     speakerColors.forEach((color, i) => document.documentElement.style.setProperty(`--sp-color-${i}`, color));
@@ -1218,7 +1239,8 @@
   function showSpeakerDropdown(anchorEl, rawSpeaker, onSelect) {
     if (scrollAnimFrame) { cancelAnimationFrame(scrollAnimFrame); scrollAnimFrame = null; }
     if (scrollDelayTimer) { clearTimeout(scrollDelayTimer); scrollDelayTimer = null; }
-    if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+    const wasPlaying = !noPauseOnSpeaker && ytPlayer && typeof ytPlayer.getPlayerState === 'function' && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+    if (!noPauseOnSpeaker && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
     const dropdown = document.getElementById('speaker-dropdown');
     dropdown.innerHTML = '';
     SPEAKERS.forEach(sp => {
@@ -1229,6 +1251,7 @@
         e.stopPropagation();
         if (sp !== rawSpeaker) onSelect(sp);
         hideSpeakerDropdown();
+        if (resumeAfterSpeaker && wasPlaying && ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
       });
       dropdown.appendChild(item);
     });
@@ -1273,7 +1296,7 @@
       e.preventDefault();
       const next = e.code === 'ArrowUp' ? activeIndex - 1 : activeIndex + 1;
       if (next >= 0 && next < captions.length) {
-        activateCaption(next);
+        activateCaption(next, true);
         seekTo(parseStart(captions[next].start), ytPlayer.getPlayerState() === YT.PlayerState.PLAYING);
       }
     } else if (speakerKeys.includes(e.key)) {
@@ -1674,14 +1697,14 @@
     return result;
   }
 
-  function activateCaption(idx) {
+  function activateCaption(idx, forceScroll = false) {
     activeIndex = idx;
     const lines = document.querySelectorAll('.caption-line');
     lines.forEach((el, i) => {
       el.classList.toggle('active', i === idx);
     });
 
-    if (idx >= 0 && !userScrolling) {
+    if (idx >= 0 && !userScrolling && (!disableAutoScroll || forceScroll)) {
       const el = lines[idx];
       const panel = document.getElementById('transcript-scroll');
       const elRect = el.getBoundingClientRect();
@@ -1712,7 +1735,8 @@
     try { currentTime = ytPlayer.getCurrentTime(); } catch { return; }
     const idx = findActiveIndex(currentTime);
     if (idx === activeIndex) return;
-    activateCaption(idx);
+    const isJump = activeIndex < 0 || Math.abs(idx - activeIndex) > 2;
+    activateCaption(idx, isJump);
   }
 
   function seekTo(seconds, play = false) {
@@ -2099,6 +2123,27 @@
   updateScrollDistanceCutoff(SCROLL_DISTANCE_CUTOFF);
   updateSloMoRate(slowMoRate);
 
+  const disableAutoScrollCheckbox = document.getElementById('disable-auto-scroll-checkbox');
+  disableAutoScrollCheckbox.checked = disableAutoScroll;
+  disableAutoScrollCheckbox.addEventListener('change', () => {
+    disableAutoScroll = disableAutoScrollCheckbox.checked;
+    localStorage.setItem('disableAutoScroll', disableAutoScroll);
+  });
+
+  const noPauseOnSpeakerCheckbox = document.getElementById('no-pause-on-speaker-checkbox');
+  noPauseOnSpeakerCheckbox.checked = noPauseOnSpeaker;
+  noPauseOnSpeakerCheckbox.addEventListener('change', () => {
+    noPauseOnSpeaker = noPauseOnSpeakerCheckbox.checked;
+    localStorage.setItem('noPauseOnSpeaker', noPauseOnSpeaker);
+  });
+
+  const resumeAfterSpeakerCheckbox = document.getElementById('resume-after-speaker-checkbox');
+  resumeAfterSpeakerCheckbox.checked = resumeAfterSpeaker;
+  resumeAfterSpeakerCheckbox.addEventListener('change', () => {
+    resumeAfterSpeaker = resumeAfterSpeakerCheckbox.checked;
+    localStorage.setItem('resumeAfterSpeaker', resumeAfterSpeaker);
+  });
+
   function renderSpeakerColorPickers() {
     const container = document.getElementById('speaker-color-rows');
     container.innerHTML = '';
@@ -2188,6 +2233,15 @@
     slowMoKey = DEFAULT_SLOMO_KEY;
     slomoKeyInput.value = slowMoKey;
     localStorage.setItem('slowMoKey', slowMoKey);
+    disableAutoScroll = false;
+    disableAutoScrollCheckbox.checked = false;
+    localStorage.removeItem('disableAutoScroll');
+    noPauseOnSpeaker = false;
+    noPauseOnSpeakerCheckbox.checked = false;
+    localStorage.removeItem('noPauseOnSpeaker');
+    resumeAfterSpeaker = false;
+    resumeAfterSpeakerCheckbox.checked = false;
+    localStorage.removeItem('resumeAfterSpeaker');
     speakerColors  = [...DEFAULT_SPEAKER_COLORS];
     speakerKeys    = [...DEFAULT_SPEAKER_KEYS];
     prevSpeakerKey = DEFAULT_PREV_SPEAKER_KEY;
