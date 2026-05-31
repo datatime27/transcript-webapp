@@ -86,12 +86,21 @@
     }
 
     .show-name {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
       font-size: 0.9rem;
       font-weight: 600;
       color: #fff;
       margin-bottom: 8px;
       padding-bottom: 7px;
       border-bottom: 1px solid #2a2a2a;
+    }
+
+    .show-stats {
+      font-size: 0.72rem;
+      font-weight: 400;
+      color: #aaa;
     }
 
     /* Season rows */
@@ -302,9 +311,9 @@
     </div>`;
   }
 
-  function renderShowGroup(showName, seasonRows) {
+  function renderShowGroup(showName, seasonRows, done, total) {
     return `<div class="show-group">
-      <div class="show-name">${escHtml(showName)}</div>
+      <div class="show-name">${escHtml(showName)}<span class="show-stats">${done} / ${total}</span></div>
       ${seasonRows.join('')}
     </div>`;
   }
@@ -354,6 +363,7 @@
     const showGroups = new Map();
     for (const show of SHOWS) {
       const rows = [];
+      let showDone = 0, showTotal = 0;
       for (let s = 1; s <= show.seasons; s++) {
         const eps = [];
         const epCount = show.episodeCounts?.[s] ?? EPS_PER_SEASON;
@@ -363,15 +373,21 @@
           };
           eps.push(ep);
           allGridEps.push(ep);
+          showTotal++;
+          if (tileStatus(ep) === 'green') showDone++;
         }
         rows.push(renderSeasonRow(s, eps, seasonCompleteSet.has(`${show.name}|${s}`)));
       }
-      showGroups.set(show.name, rows);
+      showGroups.set(show.name, { rows, done: showDone, total: showTotal });
     }
 
     const [firstName, ...restNames] = [...showGroups.keys()];
-    const leftHtml  = renderShowGroup(firstName, showGroups.get(firstName));
-    const rightHtml = restNames.map(n => renderShowGroup(n, showGroups.get(n))).join('');
+    const { rows: firstRows, done: firstDone, total: firstTotal } = showGroups.get(firstName);
+    const leftHtml  = renderShowGroup(firstName, firstRows, firstDone, firstTotal);
+    const rightHtml = restNames.map(n => {
+      const { rows, done, total } = showGroups.get(n);
+      return renderShowGroup(n, rows, done, total);
+    }).join('');
 
     renderProgressBar(allGridEps);
 
