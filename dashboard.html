@@ -373,8 +373,8 @@
           };
           eps.push(ep);
           allGridEps.push(ep);
-          showTotal++;
-          if (tileStatus(ep) === 'green') showDone++;
+          showTotal += 3;
+          showDone += ep.has_merged ? 3 : Math.min(ep.complete_count || 0, 3);
         }
         rows.push(renderSeasonRow(s, eps, seasonCompleteSet.has(`${show.name}|${s}`)));
       }
