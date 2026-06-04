@@ -639,7 +639,7 @@
 
   <!-- User Latency -->
   <div class="section">
-    <h2>User Latency</h2>
+    <h2>User Latency <span id="latency-episode-count" style="font-size:0.85rem;font-weight:normal;color:#aaa"></span></h2>
     <div class="users-table-wrap">
       <table class="users-table" id="latency-table">
         <thead><tr><th>User</th><th>Episode</th><th>Last Reminded</th><th>Last Activity</th><th>Age</th><th>Status</th><th>Latest Modification</th><th>Percent Modified</th><th>Remind</th><th>Mark as Reminded</th></tr></thead>
@@ -797,6 +797,8 @@ Alex Horne</textarea>
     function renderUserLatency(rows) {
       const tbody = document.querySelector('#latency-table tbody');
       tbody.innerHTML = '';
+      const episodeCount = new Set(rows.map(r => r.episode_uid)).size;
+      document.getElementById('latency-episode-count').textContent = episodeCount ? `(${episodeCount} episode${episodeCount === 1 ? '' : 's'} assigned)` : '';
       if (!rows.length) {
         tbody.innerHTML = '<tr><td colspan="10" style="color:#666;font-style:italic">No incomplete assignments</td></tr>';
         return;
