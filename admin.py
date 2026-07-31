@@ -100,7 +100,7 @@ It looks like **{age}** days ago you were assigned episode: **{label}**
 {link}
 
 Please let me know if you're still able to work on it.
-If you're not longer able to work on it, no worries, I can reassign it to someone else.
+If you're no longer able to work on it, no worries, I can reassign it to someone else.
 
 Thanks!
 -Peter
