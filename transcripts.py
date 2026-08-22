@@ -4,6 +4,7 @@ CGI script — serves and saves transcript data.
 
   GET  /transcripts.py?version=xxx → full transcript JSON for that version uid, with speakers injected
   GET  /transcripts.py?user=xxx    → list of {version_id, title, version, episode_uid} for episodes assigned to the user
+  GET  /transcripts.py?demo=1      → list of {version_id, title, episode_uid} for the hardcoded public demo episodes (no login)
   POST /transcripts.py             → save a new version of the transcript (body: full JSON)
 """
 
@@ -22,8 +23,14 @@ try:
     from datetime import datetime, timezone
     from pathlib import Path
     from urllib.parse import parse_qs
-    from db import get_episodes_for_user, get_user_info, get_user_name, get_version, insert_version, set_episode_complete, set_wants_more
+    from db import get_demo_episodes, get_episodes_for_user, get_user_info, get_user_name, get_version, insert_version, set_episode_complete, set_wants_more
     from mail import get_admin_email, send_email
+
+    # Episodes shown in the public no-login demo (?demo=1), in display order.
+    DEMO_EPISODE_UIDS = [
+        "PLACEHO1",
+        "PLACEHO2",
+    ]
 
 
     def valid_id(uid):
@@ -47,9 +54,14 @@ try:
         params      = parse_qs(os.environ.get("QUERY_STRING", ""))
         version_uid = params.get("version", [""])[0]
         user_uid    = params.get("user",    [""])[0]
+        demo        = params.get("demo",    [""])[0]
+
+        # Fetch the hardcoded list of publicly demoable episodes (no login required)
+        if demo:
+            body = json.dumps({"episodes": get_demo_episodes(DEMO_EPISODE_UIDS)})
 
         # Fetch a specific transcript version by uid, with speakers injected
-        if version_uid:
+        elif version_uid:
             if not valid_id(version_uid):
                 status = "400 Bad Request"
                 body   = json.dumps({"error": "Invalid version id"})

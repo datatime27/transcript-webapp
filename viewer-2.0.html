@@ -1789,11 +1789,19 @@
 
   const params  = new URLSearchParams(window.location.search);
   const userUid = params.get('user');
+  const isDemo  = params.get('demo') === '1';
   const preselectedEpisodeUid = params.get('episode');
 
-  if (!userUid) {
+  if (!userUid && !isDemo) {
     document.getElementById('load-status').textContent = 'No user specified. Please open this page with a valid ?user= parameter.';
     throw new Error('No user specified');
+  }
+
+  if (isDemo) {
+    document.getElementById('load-screen').querySelector('h1').textContent = 'Transcript Viewer — Demo';
+    document.getElementById('wants-more-btn').style.display = 'none';
+    document.getElementById('save-btn').style.display = 'none';
+    document.getElementById('done-btn').style.display = 'none';
   }
 
   async function fetchTranscriptList() {
@@ -1802,7 +1810,7 @@
     const btnEl        = document.getElementById('load-btn');
     const actionsEl    = document.getElementById('load-actions');
     try {
-      const url = `./transcripts.py?user=${encodeURIComponent(userUid)}`;
+      const url = isDemo ? './transcripts.py?demo=1' : `./transcripts.py?user=${encodeURIComponent(userUid)}`;
       const res = await fetch(url);
       const resData = await res.json().catch(() => null);
       if (res.status === 404 && resData?.error === 'User not found') {
@@ -1816,7 +1824,7 @@
       const { name, episodes: list } = resData;
       if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
       if (!list.length) {
-        statusEl.textContent = 'No available transcripts currently assigned to you.';
+        statusEl.textContent = isDemo ? 'No demo episodes are currently available.' : 'No available transcripts currently assigned to you.';
         actionsEl.style.display = 'flex';
         btnEl.style.display = 'none';
         return;

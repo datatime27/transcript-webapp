@@ -519,6 +519,32 @@ def get_episodes_for_user(user_uid):
         conn.close()
 
 
+def get_demo_episodes(episode_uids):
+    """
+    Return [{version_id, title, episode_uid}] for the given episode uids, using each
+    episode's original (unowned) version. Order follows episode_uids; unknown uids are skipped.
+    """
+    if not episode_uids:
+        return []
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        placeholders = ",".join(["%s"] * len(episode_uids))
+        cur.execute(
+            f"""SELECT e.uid, e.title, v.uid
+                FROM episodes e
+                JOIN versions v ON v.uid = (
+                  SELECT uid FROM versions WHERE episode_uid = e.uid AND user_uid IS NULL ORDER BY version_number DESC LIMIT 1
+                )
+                WHERE e.uid IN ({placeholders})""",
+            tuple(episode_uids),
+        )
+        by_episode = {row[0]: {"version_id": row[2], "title": row[1], "episode_uid": row[0]} for row in cur.fetchall()}
+        return [by_episode[uid] for uid in episode_uids if uid in by_episode]
+    finally:
+        conn.close()
+
+
 def get_version(version_uid):
     """Return (filepath, speakers, user_uid) for the given version uid."""
     conn = get_db_connection()
