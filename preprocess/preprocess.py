@@ -64,11 +64,17 @@ else:
 # ─────────────────────────────────────────────
 VIDEO_ID          = args.video_id
 AUDIO_FILE        = f"audio/{VIDEO_ID}.mp3"
-JSON_FILE         = f"C:\\Peter\\Software\\data-time-repos\\word-tracker\\transcripts\\taskmaster\\{VIDEO_ID}.json"
+TRANSCRIPTS_ROOT  = "C:\\Peter\\Software\\data-time-repos\\word-tracker\\transcripts"
+JSON_SUBDIRS      = ["taskmaster", "TaskmasterInternational"]
 
 # Validate input files exist before doing any heavy work
-if not os.path.exists(JSON_FILE):
-    parser.error(f"JSON transcript not found: {JSON_FILE}")
+for subdir in JSON_SUBDIRS:
+    candidate = f"{TRANSCRIPTS_ROOT}\\{subdir}\\{VIDEO_ID}.json"
+    if os.path.exists(candidate):
+        JSON_FILE = candidate
+        break
+else:
+    parser.error(f"JSON transcript not found in any of {JSON_SUBDIRS}: {VIDEO_ID}.json")
 if not os.path.exists(AUDIO_FILE):
     parser.error(f"Audio file not found: {AUDIO_FILE}")
 
