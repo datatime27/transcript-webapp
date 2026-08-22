@@ -546,16 +546,22 @@ def get_demo_episodes(episode_uids):
 
 
 def get_version(version_uid):
-    """Return (filepath, speakers, user_uid) for the given version uid."""
+    """Return (filepath, speakers, user_uid, is_complete) for the given version uid."""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT filepath, episode_uid, user_uid FROM versions WHERE uid = %s", (version_uid,))
+        cur.execute(
+            """SELECT v.filepath, v.episode_uid, v.user_uid, ue.is_complete
+               FROM versions v
+               LEFT JOIN user_episodes ue ON ue.episode_uid = v.episode_uid AND ue.user_uid = v.user_uid
+               WHERE v.uid = %s""",
+            (version_uid,),
+        )
         row = cur.fetchone()
         if not row:
             raise ValueError(f"No version found with uid: {version_uid}")
-        filepath, episode_uid, version_user_uid = row
-        return filepath, _get_speakers(cur, episode_uid), version_user_uid
+        filepath, episode_uid, version_user_uid, is_complete = row
+        return filepath, _get_speakers(cur, episode_uid), version_user_uid, bool(is_complete)
     finally:
         conn.close()
 

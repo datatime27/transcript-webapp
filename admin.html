@@ -422,6 +422,21 @@
       align-items: center;
     }
     .download-btn:hover { background: #215c2a; color: #c0ffc0; }
+    .edit-btn {
+      font-size: 0.75rem;
+      padding: 0 5px;
+      margin-left: 3px;
+      background: #1a2e4d;
+      color: #9ec4ff;
+      border: 1px solid #274766;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      vertical-align: middle;
+    }
+    .edit-btn:hover { background: #21395c; color: #c0d8ff; }
     .unassign-btn {
       font-size: 0.75rem;
       padding: 0 5px;
@@ -1038,14 +1053,20 @@ Alex Horne</textarea>
             const appVerStr = u.latest_app_version === '2.0' ? ' (2.0)' : '';
             const tagHtml = `<a class="${cls}" href="${href}" target="_blank"${versionAttr}${createdAtAttr}${modifiedAttr}${totalAttr}${lastModAttr}>${escHtml(u.user_name || u.user_uid)}${version}${dateStr}${pctStr}${appVerStr}</a>`;
             const unassignBtn = `<button class="unassign-btn" onclick="unassignUser(event,${escHtml(JSON.stringify(u.user_uid))},${escHtml(JSON.stringify(ep.episode_uid))},this,${u.version_number != null})" title="Remove assignment">×</button>`;
+            const editHref = u.version_uid
+              ? `viewer-2.0.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(u.version_uid)}`
+              : '';
+            const editBtn = editHref
+              ? `<a class="edit-btn" href="${editHref}" target="_blank" title="Open this version in the editor, even if locked or closed">✎</a>`
+              : '';
             if (u.version_number == null) {
               return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}</span>`;
             }
             if (u.is_complete && u.version_uid) {
               const dlFilename = `S${ep.season_number}E${ep.episode_number}_${ep.youtube_id || ''}_${(u.user_name || u.user_uid).replace(/[^a-zA-Z0-9_-]/g, '_')}.json`;
-              return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}<button class="download-btn" onclick="downloadMerged(${escHtml(JSON.stringify(u.version_uid))},${escHtml(JSON.stringify(dlFilename))})" title="Download transcript">↓</button></span>`;
+              return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}${editBtn}<button class="download-btn" onclick="downloadMerged(${escHtml(JSON.stringify(u.version_uid))},${escHtml(JSON.stringify(dlFilename))})" title="Download transcript">↓</button></span>`;
             }
-            return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}</span>`;
+            return `<span class="episode-user-tag-wrapper">${unassignBtn}${tagHtml}${editBtn}</span>`;
           }).join('')
         : '<span class="episode-no-users">no users allocated</span>';
       const lockBadge = isLocked ? '<span class="lock-badge">🔒 locked</span>' : '';
@@ -1213,7 +1234,7 @@ Alex Horne</textarea>
         `<tr>
           <td><a href="https://itsdatatime.com/transcript-webapp/viewer-2.0.html?user=${escHtml(v.user_uid)}" target="_blank" class="link">${escHtml(v.user_name || '—')}</a></td>
           <td>${escHtml(v.show || '—')} S${v.season} E${v.episode}</td>
-          <td>v${v.version_number}</td>
+          <td>v${v.version_number} <a class="edit-btn" href="viewer-2.0.html?user=${encodeURIComponent(userUid)}&version=${encodeURIComponent(v.version_uid)}" target="_blank" title="Open this version in the editor, even if locked or closed">✎</a></td>
           <td>${v.is_complete ? '✓' : ''}</td>
           <td class="text-timestamp">${new Date(v.created_at).toLocaleString()}</td>
         </tr>`

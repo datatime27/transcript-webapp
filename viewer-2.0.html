@@ -1127,7 +1127,8 @@
   function markModified(cap) {
     cap.modified = true;
     if (!cap.modification_history) cap.modification_history = [];
-    if (!cap.modification_history.includes(userUid)) cap.modification_history.push(userUid);
+    const actingUid = loggedInUid || userUid;
+    if (!cap.modification_history.includes(actingUid)) cap.modification_history.push(actingUid);
   }
 
   // ── Edit mode operations ───────────────────────────────────────────────────
@@ -1186,7 +1187,7 @@
     const insertAt = Math.max(0, afterIndex + 1);
     const templateSpeaker = afterIndex >= 0 ? captions[afterIndex].speaker : (captions[0] && captions[0].speaker) || 'UNKNOWN';
     pushUndo();
-    captions.splice(insertAt, 0, { text: '', start: newStart, duration: newDuration, speaker: templateSpeaker, modified: true, modification_history: [userUid] });
+    captions.splice(insertAt, 0, { text: '', start: newStart, duration: newDuration, speaker: templateSpeaker, modified: true, modification_history: [loggedInUid || userUid] });
     unsavedChanges = true;
     buildSpeakerMap();
     activeIndex = -1;
@@ -1217,7 +1218,7 @@
     const ratio = fullText.length > 0 ? charOffset / fullText.length : 0.5;
     const leftDur = totalDur * ratio;
     const splitHistory = [...(cap.modification_history || [])];
-    if (!splitHistory.includes(userUid)) splitHistory.push(userUid);
+    if (!splitHistory.includes(loggedInUid || userUid)) splitHistory.push(loggedInUid || userUid);
     pushUndo();
     captions.splice(i, 1,
       { ...cap, text: leftText, duration: leftDur, modified: true, modification_history: splitHistory },
@@ -1788,9 +1789,11 @@
   }
 
   const params  = new URLSearchParams(window.location.search);
-  const userUid = params.get('user');
+  const loggedInUid = params.get('user'); // whoever is actually using the page — never reassigned
+  let   userUid = loggedInUid;            // whose version history we're viewing/saving to — reassigned to the owner for admin opens
   const isDemo  = params.get('demo') === '1';
   const preselectedEpisodeUid = params.get('episode');
+  const preselectedVersionUid = params.get('version');
 
   if (!userUid && !isDemo) {
     document.getElementById('load-status').textContent = 'No user specified. Please open this page with a valid ?user= parameter.';
@@ -1823,6 +1826,19 @@
       if (!res.ok) throw new Error(resData?.error || `Server returned ${res.status}`);
       const { name, episodes: list } = resData;
       if (name) document.getElementById('load-screen').querySelector('h1').textContent = `Transcript Viewer — ${name}`;
+      // Direct link to a specific version (e.g. an admin opening a locked/closed episode) —
+      // load it even if it's been filtered out of the current user's normal list (completed season, etc).
+      // transcripts.py decides server-side (via is_admin) whether to treat this as an admin
+      // open and hand back the version's real owner; fetchAndLoad() picks that up below.
+      if (preselectedVersionUid) {
+        const matched = list.find(e => e.version_id === preselectedVersionUid);
+        try {
+          await fetchAndLoad(preselectedVersionUid, matched?.version ?? null, matched?.is_complete ?? false);
+        } catch (err) {
+          showLoadError(`Could not load transcript: ${err.message}`);
+        }
+        return;
+      }
       if (!list.length) {
         statusEl.textContent = isDemo ? 'No demo episodes are currently available.' : 'No available transcripts currently assigned to you.';
         actionsEl.style.display = 'flex';
@@ -1866,9 +1882,18 @@
   }
 
   async function fetchAndLoad(versionUid, version, isComplete = false) {
-    const res = await fetch(`./transcripts.py?version=${versionUid}&user=${encodeURIComponent(userUid)}`);
+    const userParam = userUid ? `&user=${encodeURIComponent(userUid)}` : '';
+    const res = await fetch(`./transcripts.py?version=${versionUid}${userParam}`);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
+    // Admin open of someone else's version: the server hands back the real owner so
+    // Save/Done continue their version history instead of creating one under the admin.
+    if (data.owner_uid && data.owner_uid !== userUid) {
+      userUid = data.owner_uid;
+      isComplete = !!data.is_complete;
+      document.getElementById('load-screen').querySelector('h1').textContent =
+        `Transcript Viewer — ${data.owner_name || userUid} (admin)`;
+    }
     loadTranscript(data, version, versionUid, data.speakers || [], isComplete);
   }
 

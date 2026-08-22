@@ -23,7 +23,7 @@ try:
     from datetime import datetime, timezone
     from pathlib import Path
     from urllib.parse import parse_qs
-    from db import get_demo_episodes, get_episodes_for_user, get_user_info, get_user_name, get_version, insert_version, set_episode_complete, set_wants_more
+    from db import get_demo_episodes, get_episodes_for_user, get_user_info, get_user_name, get_version, insert_version, is_admin, set_episode_complete, set_wants_more
     from mail import get_admin_email, send_email
 
     # Episodes shown in the public no-login demo (?demo=1), in display order.
@@ -67,7 +67,7 @@ try:
                 body   = json.dumps({"error": "Invalid version id"})
                 return
             try:
-                filepath, speakers, version_user_uid = get_version(version_uid)
+                filepath, speakers, version_user_uid, version_is_complete = get_version(version_uid)
             except ValueError as e:
                 status = "404 Not Found"
                 body   = json.dumps({"error": str(e)})
@@ -79,10 +79,17 @@ try:
                 return
             data = json.loads(path.read_text(encoding="utf-8"))
             data["speakers"] = speakers
-            # For 2.0 review workflow: if a different user is loading this version,
-            # reset modified:false so only the current user's changes are highlighted.
+
             requesting_user_uid = params.get("user", [""])[0] or None
-            if requesting_user_uid and version_user_uid and requesting_user_uid != version_user_uid:
+            if requesting_user_uid and version_user_uid and requesting_user_uid != version_user_uid and is_admin(requesting_user_uid):
+                # Admin opening someone else's version directly (locked episode, completed
+                # season, already-done version, etc). Saves should still be attributed to the
+                # version's actual owner, not the admin, so hand the owner's identity back.
+                data["owner_uid"]   = version_user_uid
+                data["owner_name"]  = get_user_name(version_user_uid)
+                data["is_complete"] = version_is_complete
+            elif requesting_user_uid and version_user_uid and requesting_user_uid != version_user_uid:
+                # v2.0 review workflow: reset modified:false so only the current user's changes are highlighted.
                 for cap in data.get("captions", []):
                     cap["modified"] = False
             body = json.dumps(data, ensure_ascii=False)
