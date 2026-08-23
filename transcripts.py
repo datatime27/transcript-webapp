@@ -28,10 +28,11 @@ try:
 
     # Episodes shown in the public no-login demo (?demo=1), in display order.
     DEMO_EPISODE_UIDS = [
-        "PLACEHO1",
-        "PLACEHO2",
+        "9aa8wgdg", # Taskmaster Season 20, Episode 1 - '9x7.'
+        "qhn269vq", # Taskmaster International, Episode 1 - 'Melon buffet.'
+        "i26jdc4b", # Taskmaster Australia, Season 1, Episode 1
+        "tx226jjs", # Taskmaster New Zealand, Series 1, Episode 1 - 'Gluten free.'
     ]
-
 
     def valid_id(uid):
         return uid and all(c.isalnum() or c in "-_" for c in uid)
