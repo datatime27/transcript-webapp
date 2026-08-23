@@ -1894,6 +1894,15 @@
       document.getElementById('load-screen').querySelector('h1').textContent =
         `Transcript Viewer — ${data.owner_name || userUid} (admin)`;
     }
+    // Admin viewing the original (unowned) transcript: no one to attribute a save to,
+    // so hide Save/Done — everything else (speaker/text/timecode editing) stays interactive.
+    if (!isDemo) {
+      document.getElementById('save-btn').style.display = data.is_original ? 'none' : '';
+      document.getElementById('done-btn').style.display = data.is_original ? 'none' : '';
+    }
+    if (data.is_original) {
+      document.getElementById('load-screen').querySelector('h1').textContent = 'Transcript Viewer — Original transcript (admin, view only)';
+    }
     loadTranscript(data, version, versionUid, data.speakers || [], isComplete);
   }
 

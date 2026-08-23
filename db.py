@@ -147,7 +147,8 @@ def get_episodes_with_user_versions():
                       (SELECT latest_modification FROM versions WHERE episode_uid = e.uid AND user_uid = u.uid ORDER BY version_number DESC LIMIT 1),
                       (SELECT v3.uid        FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1),
                       (SELECT v3.user_uid   FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1),
-                      (SELECT v3.created_at FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1)
+                      (SELECT v3.created_at FROM versions v3 WHERE v3.episode_uid = e.uid AND v3.is_merged = 1 ORDER BY v3.version_number DESC LIMIT 1),
+                      (SELECT v4.uid        FROM versions v4 WHERE v4.episode_uid = e.uid AND v4.user_uid IS NULL ORDER BY v4.version_number DESC LIMIT 1)
                FROM episodes e
                JOIN seasons season ON season.uid = e.season_uid
                JOIN shows s ON s.uid = season.show_uid
@@ -173,6 +174,7 @@ def get_episodes_with_user_versions():
                     "merged_at":           row[25].replace(tzinfo=_EASTERN).isoformat() if row[25] else None,
                     "season_complete":   bool(row[13]),
                     "season_uid":        row[18],
+                    "original_version_uid": row[26],
                     "users":             [],
                 }
             if row[3] is not None:

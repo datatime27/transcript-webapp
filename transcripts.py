@@ -82,7 +82,12 @@ try:
             data["speakers"] = speakers
 
             requesting_user_uid = params.get("user", [""])[0] or None
-            if requesting_user_uid and version_user_uid and requesting_user_uid != version_user_uid and is_admin(requesting_user_uid):
+            is_requester_admin  = bool(requesting_user_uid) and is_admin(requesting_user_uid)
+            if is_requester_admin and version_user_uid is None:
+                # Admin viewing the original (unowned) transcript — no owner to attribute
+                # edits to, so the frontend treats this as view-only.
+                data["is_original"] = True
+            elif is_requester_admin and version_user_uid and requesting_user_uid != version_user_uid:
                 # Admin opening someone else's version directly (locked episode, completed
                 # season, already-done version, etc). Saves should still be attributed to the
                 # version's actual owner, not the admin, so hand the owner's identity back.
